@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
+import { getMe } from '../lib/api'
+import type { UserProfile } from '../types'
 
 const navClassName = ({ isActive }: { isActive: boolean }) =>
   isActive ? 'nav-link nav-link-active' : 'nav-link'
@@ -10,6 +12,28 @@ export function AppShell() {
   const navigate = useNavigate()
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<string | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+
+  useEffect(() => {
+    let active = true
+    if (!session) {
+      return
+    }
+    getMe()
+      .then((nextProfile) => {
+        if (active) {
+          setProfile(nextProfile)
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setProfile(null)
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, [session])
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -46,6 +70,14 @@ export function AppShell() {
               <NavLink className={navClassName} to="/account/vehicles">
                 Vehicles
               </NavLink>
+              <NavLink className={navClassName} to="/account/listings">
+                Listings
+              </NavLink>
+              {profile?.is_admin ? (
+                <NavLink className={navClassName} to="/admin/listings">
+                  Admin
+                </NavLink>
+              ) : null}
               <button
                 className="button button-quiet"
                 type="button"

@@ -27,7 +27,12 @@ claims.
   handling. Hosted demo login is still pending, so `G-V1` is not fully closed.
 - V1 CI is green on GitHub
   ([run 40348810807](https://github.com/TheOnlySG/sthalo/actions/runs/40348810807)).
-- Next: finish hosted V1 when provider resources exist, otherwise start V2.
+- V2 owner listings are implemented locally: draft/edit/submit, private
+  validated photos, moderation, lifecycle actions, public listing detail, and
+  the local admin queue. The reservation schema needed by archive safety checks
+  is in migration `20261026_0003`; booking APIs remain deferred.
+- Hosted `G-V1` remains unverified because no hosted provider resources exist.
+  V2 proceeds as a local-only slice under that documented exception.
 - Hosted deployment: not started. No Render, Supabase, or Cloudflare Pages
   project has been created.
 - Payments, EV charging, reviews, disputes, and payouts: deferred.
@@ -86,7 +91,9 @@ npx --yes supabase@2.122.0 stop
 schema is owned by Alembic. Baseline `20261026_0001` creates `sthalo` and
 `extensions` and installs PostGIS, `btree_gist`, and `pgcrypto`; migration
 `20261026_0002` adds `sthalo.users`, `sthalo.vehicles`, and the trigger that
-provisions a local profile for each Supabase auth user. Do not use
+provisions a local profile for each Supabase auth user. Migration
+`20261026_0003` adds listings, parking attributes, resources, photos, audit
+events, and the reservation schema used by archive safety checks. Do not use
 `supabase db reset` as the application migration source.
 
 ## Quick start
@@ -99,10 +106,12 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 alembic upgrade head
+python scripts/setup_local_storage.py
 uvicorn app.main:app --reload --port 8000
 ```
 
-Health checks: `GET /health/live` and `GET /health/ready` on
+`scripts/setup_local_storage.py` creates the private `listing-photos` bucket.
+It is idempotent. Health checks: `GET /health/live` and `GET /health/ready` on
 `http://127.0.0.1:8000`. Readiness requires the current Alembic head. API docs are
 at `http://127.0.0.1:8000/docs`. Backend checks:
 
@@ -139,7 +148,13 @@ npm run format:check
    open its link.
 3. Sign in at `/login`. The auth trigger creates the local profile.
 4. Edit the profile, accept owner terms, and add/edit/remove up to ten vehicles.
-5. Sign out from the header. Password reset also uses Mailpit and lands on
+5. Open `/account/listings`, create a parking draft, add pricing and 1–8 photos,
+   then submit it for review. Public detail appears only after approval.
+6. To review locally, promote a test account in Studio SQL:
+   `UPDATE sthalo.users SET is_admin = true WHERE email = '<your-email>';`
+   Then open `/admin/listings`, approve/reject/suspend/restore, and refresh the
+   owner dashboard to see the result.
+7. Sign out from the header. Password reset also uses Mailpit and lands on
    `/reset-password`, where the new password is set.
 
 The backend verifies Supabase access tokens against the local JWKS. Keep the
@@ -148,8 +163,8 @@ stores or submits passwords to FastAPI; Supabase Auth owns credentials.
 
 The CI workflow runs backend lint, format, type checks, unit tests, migrations
 up/down/up, integration tests, and the PostGIS/`btree_gist` probe, plus frontend
-lint, typecheck, tests, build, and formatting. V0 CI is green, the fresh-clone
-`G-V0` check passed, and V1 CI is green.
+lint, typecheck, tests, build, and formatting. V0 and V1 CI are green; V2 local
+checks cover the owner, photo, moderation, public-detail, and lifecycle flows.
 
 ## Hosted demo policy
 

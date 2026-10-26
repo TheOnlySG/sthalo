@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import Settings
 from app.integrations.auth.jwks import JwksCache
+from app.integrations.storage.dependencies import get_photo_storage
 from app.main import create_app
 from app.modules.identity.dependencies import get_jwks_cache
 
@@ -35,9 +36,39 @@ PUBLIC_JWK.update({"kid": KID, "alg": "ES256", "use": "sig", "key_ops": ["verify
 
 @dataclass(frozen=True, slots=True)
 class TestUser:
+    __test__ = False
+
     id: UUID
     email: str
     full_name: str
+
+
+class FakePhotoStorage:
+    """In-memory replacement for Supabase Storage in API tests."""
+
+    def __init__(self) -> None:
+        self.objects: dict[str, bytes] = {}
+        self.fail_uploads = False
+        self.fail_signs = False
+
+    async def upload(self, key: str, data: bytes, content_type: str) -> None:
+        if self.fail_uploads:
+            from app.integrations.storage.supabase import PhotoStorageError
+
+            raise PhotoStorageError("forced upload failure")
+        self.objects[key] = data
+        del content_type
+
+    async def delete(self, key: str) -> None:
+        self.objects.pop(key, None)
+
+    async def signed_url(self, key: str, expires_in: int = 3600) -> str:
+        if self.fail_signs:
+            from app.integrations.storage.supabase import PhotoStorageError
+
+            raise PhotoStorageError("forced signing failure")
+        del expires_in
+        return f"http://storage.test/{key}?token=test"
 
 
 async def _fetch_jwks() -> dict[str, Any]:
@@ -127,9 +158,19 @@ def test_settings() -> Settings:
 
 
 @pytest.fixture
-def client(test_settings: Settings, jwks_cache: JwksCache) -> Iterator[TestClient]:
+def photo_storage() -> FakePhotoStorage:
+    return FakePhotoStorage()
+
+
+@pytest.fixture
+def client(
+    test_settings: Settings,
+    jwks_cache: JwksCache,
+    photo_storage: FakePhotoStorage,
+) -> Iterator[TestClient]:
     application = create_app(test_settings)
     application.dependency_overrides[get_jwks_cache] = lambda: jwks_cache
+    application.dependency_overrides[get_photo_storage] = lambda: photo_storage
     with TestClient(application) as test_client:
         yield test_client
 

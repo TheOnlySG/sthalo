@@ -3,8 +3,10 @@
 React + Vite + TypeScript SPA for the Sthalo Phase 1 parking MVP.
 
 V1 includes Supabase Auth session handling, protected routes, profile and
-owner-terms screens, and private vehicle management. Listings, maps,
-availability, and reservations arrive in later vertical slices.
+owner-terms screens, and private vehicle management. V2 adds the owner listing
+wizard, private photo management, public listing detail, and the local admin
+moderation queue. Discovery maps, availability, and reservations arrive in later
+vertical slices.
 
 ## Local checks
 
@@ -21,6 +23,10 @@ Routes:
 
 - `/`, `/login`, `/register`, `/verify-email`, `/reset-password`
 - `/account/profile`, `/account/vehicles` (authenticated)
+- `/account/listings`, `/account/listings/new`,
+  `/account/listings/:listingId/edit` (authenticated owners)
+- `/admin/listings` (authenticated local admin)
+- `/parking/:listingId` (public active listing)
 
 ## Local Supabase
 
@@ -38,9 +44,12 @@ backend `/api/v1` URL. Local email confirmation and password-reset messages are
 captured by Mailpit at `http://127.0.0.1:54324`. Never place the service-role or
 secret key in the frontend.
 
-Start the backend on `http://127.0.0.1:8000`, then run `npm run dev`. Create an
-account at `/register`, confirm it through Mailpit, sign in, and open the profile
-or vehicles page.
+Start the backend on `http://127.0.0.1:8000` and run the backend storage setup
+script, then run `npm run dev`. Create an account at `/register`, confirm it
+through Mailpit, sign in, accept owner terms, and create a listing from
+`/account/listings`. Promote a local test account with
+`UPDATE sthalo.users SET is_admin = true WHERE email = '<your-email>';` to use
+`/admin/listings`.
 
 ## Cloudflare Pages
 

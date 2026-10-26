@@ -163,12 +163,40 @@ jobs:
                   version = await conn.fetchval(
                       "SELECT version_num FROM sthalo.alembic_version"
                   )
-                  assert version == "20261026_0002", version
+                  assert version == "20261026_0003", version
                   tables = {
                       await conn.fetchval("SELECT to_regclass('sthalo.users')"),
                       await conn.fetchval("SELECT to_regclass('sthalo.vehicles')"),
+                      await conn.fetchval("SELECT to_regclass('sthalo.listings')"),
+                      await conn.fetchval("SELECT to_regclass('sthalo.parking_listings')"),
+                      await conn.fetchval("SELECT to_regclass('sthalo.resources')"),
+                      await conn.fetchval("SELECT to_regclass('sthalo.listing_photos')"),
+                      await conn.fetchval("SELECT to_regclass('sthalo.reservations')"),
+                      await conn.fetchval("SELECT to_regclass('sthalo.audit_events')"),
                   }
-                  assert tables == {"sthalo.users", "sthalo.vehicles"}, tables
+                  expected_tables = {
+                      "sthalo.users",
+                      "sthalo.vehicles",
+                      "sthalo.listings",
+                      "sthalo.parking_listings",
+                      "sthalo.resources",
+                      "sthalo.listing_photos",
+                      "sthalo.reservations",
+                      "sthalo.audit_events",
+                  }
+                  assert tables == expected_tables, tables
+                  reservation_exclusion = await conn.fetchval(
+                      "SELECT 1 FROM pg_constraint "
+                      "WHERE conname = 'reservations_no_overlap' "
+                      "AND conrelid = 'sthalo.reservations'::regclass"
+                  )
+                  assert reservation_exclusion == 1, reservation_exclusion
+                  deferred_photo_position = await conn.fetchval(
+                      "SELECT condeferrable AND condeferred FROM pg_constraint "
+                      "WHERE conname = 'uq_listing_photos_position' "
+                      "AND conrelid = 'sthalo.listing_photos'::regclass"
+                  )
+                  assert deferred_photo_position is True, deferred_photo_position
                   trigger = await conn.fetchval(
                       "SELECT 1 FROM pg_trigger "
                       "WHERE tgrelid = 'auth.users'::regclass "

@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { acceptOwnerTerms, errorMessage, getMe, updateMe } from '../lib/api'
+import { CURRENT_OWNER_TERMS_VERSION } from '../lib/ownerTerms'
 import type { UserProfile } from '../types'
-
-const CURRENT_OWNER_TERMS_VERSION = '2026-10-26'
 
 function formatDate(value: string | null): string {
   if (!value) {
@@ -118,9 +117,14 @@ export function ProfilePage() {
           <h1>Your profile</h1>
           <p className="muted">Signed in as {profile.email}</p>
         </div>
-        <Link className="button button-secondary" to="/account/vehicles">
-          Manage vehicles
-        </Link>
+        <div className="header-actions">
+          <Link className="button button-secondary" to="/account/vehicles">
+            Manage vehicles
+          </Link>
+          <Link className="button" to="/account/listings">
+            Owner listings
+          </Link>
+        </div>
       </header>
 
       {error ? (
@@ -169,8 +173,8 @@ export function ProfilePage() {
         <section className="panel">
           <h2>Owner terms</h2>
           <p>
-            Owners must accept the demo owner terms before creating a listing. Listings are not
-            available in this slice.
+            Owners must accept the demo owner terms before creating a parking listing. You can
+            revisit this page whenever the owner terms version changes.
           </p>
           <p className="muted">
             Current version: <strong>{CURRENT_OWNER_TERMS_VERSION}</strong>

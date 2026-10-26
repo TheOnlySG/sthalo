@@ -9,17 +9,18 @@ export function HomePage() {
       <p className="eyebrow">Nashik · Phase 1 demo</p>
       <h1>Parking reservations, without the payment layer.</h1>
       <p className="lede">
-        Sthalo will connect drivers with private parking. This demo currently covers accounts,
-        profiles, and vehicles. Listings, availability, and reservations arrive in later slices.
+        Sthalo will connect drivers with private parking. This local demo now covers accounts,
+        vehicles, owner listings with private photos, and admin moderation. Availability and
+        reservations arrive in later slices.
       </p>
       <div className="hero-actions">
         {session ? (
           <>
-            <Link className="button" to="/account/profile">
-              Open your profile
+            <Link className="button" to="/account/listings">
+              Manage parking listings
             </Link>
-            <Link className="button button-secondary" to="/account/vehicles">
-              Manage vehicles
+            <Link className="button button-secondary" to="/account/profile">
+              Open your profile
             </Link>
           </>
         ) : (
@@ -36,24 +37,24 @@ export function HomePage() {
 
       <div className="feature-grid">
         <article className="card">
-          <h2>Authenticated with Supabase</h2>
+          <h2>Owner listings</h2>
           <p>
-            Signup, login, refresh, and email verification are handled by Supabase Auth. The API
-            verifies every access token; FastAPI never stores passwords.
+            Create a parking draft, set fit limits and pricing, then submit it for local moderation.
+            Exact addresses stay private.
           </p>
         </article>
         <article className="card">
-          <h2>Local profiles</h2>
+          <h2>Private photo pipeline</h2>
           <p>
-            Each verified account gets a local profile with a display name, optional phone number,
-            and owner-terms acceptance.
+            Listing photos are validated and re-encoded, stored in a private bucket, and served with
+            short-lived signed URLs.
           </p>
         </article>
         <article className="card">
-          <h2>Minimal vehicles</h2>
+          <h2>Admin review</h2>
           <p>
-            Add up to ten vehicles with type, optional dimensions, and registration details. Vehicle
-            records are private to your account.
+            A local admin queue approves, rejects, suspends, or restores listings with a recorded
+            note and audit trail.
           </p>
         </article>
       </div>

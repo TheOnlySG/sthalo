@@ -1,6 +1,19 @@
 import { supabase } from './supabase'
 import { API_BASE_URL } from './env'
-import type { UserProfile, Vehicle, VehicleInput } from '../types'
+import type {
+  AdminListing,
+  ListingBasicsInput,
+  ListingCreateInput,
+  ListingPhoto,
+  ListingStatus,
+  OwnerListing,
+  OwnerListingSummary,
+  ParkingInput,
+  PublicListing,
+  UserProfile,
+  Vehicle,
+  VehicleInput,
+} from '../types'
 
 interface ApiErrorPayload {
   error: {
@@ -55,7 +68,8 @@ interface RequestOptions {
 async function request<T>(path: string, options: RequestOptions = {}, retry = true): Promise<T> {
   const { data } = await supabase.auth.getSession()
   const headers = new Headers({ Accept: 'application/json' })
-  if (options.body !== undefined) {
+  const isFormData = options.body instanceof FormData
+  if (options.body !== undefined && !isFormData) {
     headers.set('Content-Type', 'application/json')
   }
   if (data.session?.access_token) {
@@ -65,7 +79,12 @@ async function request<T>(path: string, options: RequestOptions = {}, retry = tr
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: options.method ?? 'GET',
     headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body:
+      options.body === undefined
+        ? undefined
+        : isFormData
+          ? (options.body as FormData)
+          : JSON.stringify(options.body),
   })
 
   if (response.status === 401 && retry) {
@@ -129,6 +148,116 @@ export function updateVehicle(id: string, values: Partial<VehicleInput>): Promis
 
 export function deleteVehicle(id: string): Promise<void> {
   return request<void>(`/vehicles/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export function listOwnerListings(): Promise<OwnerListingSummary[]> {
+  return request<OwnerListingSummary[]>('/owner/parking-listings')
+}
+
+export function createListing(values: ListingCreateInput): Promise<OwnerListing> {
+  return request<OwnerListing>('/owner/parking-listings', { method: 'POST', body: values })
+}
+
+export function getOwnerListing(id: string): Promise<OwnerListing> {
+  return request<OwnerListing>(`/owner/parking-listings/${encodeURIComponent(id)}`)
+}
+
+export function updateListing(
+  id: string,
+  values: Partial<ListingBasicsInput> & { parking?: ParkingInput },
+): Promise<OwnerListing> {
+  return request<OwnerListing>(`/owner/parking-listings/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: values,
+  })
+}
+
+export function submitListing(id: string, declarationAccepted: boolean): Promise<OwnerListing> {
+  return request<OwnerListing>(`/owner/parking-listings/${encodeURIComponent(id)}/submit`, {
+    method: 'POST',
+    body: { declaration_accepted: declarationAccepted },
+  })
+}
+
+export function pauseListing(id: string): Promise<OwnerListing> {
+  return request<OwnerListing>(`/owner/parking-listings/${encodeURIComponent(id)}/pause`, {
+    method: 'POST',
+  })
+}
+
+export function resumeListing(id: string): Promise<OwnerListing> {
+  return request<OwnerListing>(`/owner/parking-listings/${encodeURIComponent(id)}/resume`, {
+    method: 'POST',
+  })
+}
+
+export function archiveListing(id: string): Promise<OwnerListing> {
+  return request<OwnerListing>(`/owner/parking-listings/${encodeURIComponent(id)}/archive`, {
+    method: 'POST',
+  })
+}
+
+export function uploadListingPhoto(id: string, file: File): Promise<OwnerListing> {
+  const body = new FormData()
+  body.append('file', file)
+  return request<OwnerListing>(`/owner/parking-listings/${encodeURIComponent(id)}/photos`, {
+    method: 'POST',
+    body,
+  })
+}
+
+export function updateListingPhoto(
+  listingId: string,
+  photoId: string,
+  values: Partial<Pick<ListingPhoto, 'position' | 'is_cover'>>,
+): Promise<OwnerListing> {
+  return request<OwnerListing>(
+    `/owner/parking-listings/${encodeURIComponent(listingId)}/photos/${encodeURIComponent(photoId)}`,
+    { method: 'PATCH', body: values },
+  )
+}
+
+export function deleteListingPhoto(listingId: string, photoId: string): Promise<void> {
+  return request<void>(
+    `/owner/parking-listings/${encodeURIComponent(listingId)}/photos/${encodeURIComponent(photoId)}`,
+    { method: 'DELETE' },
+  )
+}
+
+export function getPublicListing(id: string): Promise<PublicListing> {
+  return request<PublicListing>(`/parking-listings/${encodeURIComponent(id)}`)
+}
+
+export function listAdminListings(status?: ListingStatus): Promise<AdminListing[]> {
+  const suffix = status ? `?status=${encodeURIComponent(status)}` : ''
+  return request<AdminListing[]>(`/admin/listings${suffix}`)
+}
+
+function moderateListing(
+  id: string,
+  action: 'approve' | 'reject' | 'suspend' | 'restore',
+  note: string | null,
+): Promise<AdminListing> {
+  return request<AdminListing>(`/admin/listings/${encodeURIComponent(id)}/${action}`, {
+    method: 'POST',
+    body: { note },
+  })
+}
+
+export function approveListing(id: string, note: string | null): Promise<AdminListing> {
+  return moderateListing(id, 'approve', note)
+}
+
+export function rejectListing(id: string, note: string): Promise<AdminListing> {
+  return moderateListing(id, 'reject', note)
+}
+
+export function suspendListing(id: string, note: string): Promise<AdminListing> {
+  return moderateListing(id, 'suspend', note)
+}
+
+export function restoreListing(id: string, note: string): Promise<AdminListing> {
+  return moderateListing(id, 'restore', note)
 }
 
 export function errorMessage(error: unknown): string {

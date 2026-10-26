@@ -3,10 +3,10 @@
 FastAPI + async SQLAlchemy backend for the Sthalo Phase 1 parking MVP.
 
 The repository is being built in vertical slices. This checkpoint contains the
-application foundation plus V1 identity, profile, owner-terms, and vehicle APIs.
-Supabase Auth owns credentials; FastAPI verifies access tokens through JWKS and
-never handles passwords. Listings, discovery, and reservations arrive in later
-slices.
+application foundation, V1 identity/profile/owner-terms/vehicle APIs, and V2
+owner listings with private photos and admin moderation. Supabase Auth owns
+credentials; FastAPI verifies access tokens through JWKS and never handles
+passwords. Discovery, availability, and booking APIs arrive in later slices.
 
 ## Configuration
 
@@ -48,8 +48,12 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 alembic upgrade head
+python scripts/setup_local_storage.py
 uvicorn app.main:app --reload --port 8000
 ```
+
+The storage setup script creates the private `listing-photos` bucket. Uploads
+are re-encoded with Pillow and served through short-lived signed URLs.
 
 Health endpoints:
 
@@ -69,9 +73,18 @@ token except where noted:
 - `POST /users/me/accept-owner-terms`
 - `GET /vehicles`, `POST /vehicles`
 - `PATCH /vehicles/{vehicle_id}`, `DELETE /vehicles/{vehicle_id}`
+- `POST /owner/parking-listings`, `GET /owner/parking-listings`
+- `GET/PATCH /owner/parking-listings/{listing_id}`
+- `POST /owner/parking-listings/{listing_id}/submit|pause|resume|archive`
+- `POST/PATCH/DELETE /owner/parking-listings/{listing_id}/photos[/{photo_id}]`
+- `GET /parking-listings/{listing_id}` (public, active listings only)
+- `GET /admin/listings`, `GET /admin/listings/{listing_id}`
+- `POST /admin/listings/{listing_id}/approve|reject|suspend|restore`
 
-The `/health/live` and `/health/ready` endpoints are unauthenticated. Interactive
-docs are at `/docs`.
+Public listing responses omit exact addresses, pincodes, and access
+instructions. Admin routes require `sthalo.users.is_admin = true`; a Supabase
+token role is never trusted for admin access. The `/health/live` and
+`/health/ready` endpoints are unauthenticated. Interactive docs are at `/docs`.
 
 ## Database migrations
 
@@ -90,8 +103,11 @@ preserves shared schemas/extensions. If PostGIS already exists outside
 
 Migration `20261026_0002` creates `sthalo.users`, `sthalo.vehicles`, the
 `set_updated_at` trigger helper, and `trg_auth_users_create_profile` on
-`auth.users`. A Supabase auth-user insert provisions the local profile; deleting
-the auth user cascades to the profile and vehicles. Integration tests expect a
+`auth.users`. Migration `20261026_0003` adds `sthalo.listings`,
+`parking_listings`, `resources`, `listing_photos`, `reservations`, and
+`audit_events`, including reservation overlap protection and deferred photo
+position swaps. A Supabase auth-user insert provisions the local profile;
+deleting the auth user cascades to profile-owned data. Integration tests expect a
 mock `auth.users` table in the test database.
 
 ## Checks

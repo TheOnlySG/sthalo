@@ -16,6 +16,7 @@ from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.request_id import REQUEST_ID_HEADER, RequestIDMiddleware
 from app.db.engine import build_engine, build_session_factory
+from app.integrations.storage.supabase import SupabasePhotoStorage
 
 
 @asynccontextmanager
@@ -27,9 +28,12 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     engine = build_engine(settings)
     application.state.engine = engine
     application.state.session_factory = build_session_factory(engine)
+    photo_storage = SupabasePhotoStorage(settings)
+    application.state.photo_storage = photo_storage
     try:
         yield
     finally:
+        await photo_storage.close()
         await engine.dispose()
 
 
