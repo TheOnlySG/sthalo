@@ -1,0 +1,13 @@
+# Alembic
+
+Run from `backend/` with `DATABASE_URL` configured:
+
+```bash
+alembic upgrade head
+alembic downgrade base
+alembic current
+```
+
+The baseline creates the `sthalo` and `extensions` schemas and installs
+PostGIS, `btree_gist`, and `pgcrypto` into `extensions`. The downgrade preserves
+shared schemas/extensions because Supabase-managed services may depend on them.

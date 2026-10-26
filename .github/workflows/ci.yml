@@ -1,0 +1,223 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      ENV: test
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      LOG_JSON: "true"
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/sthalo_test
+      SUPABASE_URL: http://127.0.0.1:54321
+      SUPABASE_ANON_KEY: ci-placeholder
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+      SUPABASE_JWKS_URL: http://127.0.0.1:54321/auth/v1/.well-known/jwks.json
+      SUPABASE_JWT_ISSUER: http://127.0.0.1:54321/auth/v1
+      SUPABASE_JWT_AUDIENCE: authenticated
+      CORS_ORIGINS: http://localhost:5173
+      SWEEPER_ENABLED: "false"
+      ALLOW_SWEEPER_DISABLED: "false"
+      SWEEPER_INTERVAL_SECONDS: "45"
+      MAX_UPLOAD_BYTES: "5242880"
+      GEOCODE_PROVIDER: none
+      PGPASSWORD: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint
+        working-directory: backend
+        run: ruff check .
+
+      - name: Check formatting
+        working-directory: backend
+        run: ruff format --check .
+
+      - name: Type check
+        working-directory: backend
+        run: mypy app
+
+      - name: Unit tests
+        working-directory: backend
+        run: pytest
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create clean test database
+        run: |
+          for attempt in $(seq 1 30); do
+            if psql -h 127.0.0.1 -U postgres -d postgres -c 'select 1' >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'drop database if exists sthalo_test;'
+          psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'create database sthalo_test;'
+
+      - name: Run migrations up/down/up
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          import asyncio
+          import os
+          import asyncpg
+
+          async def normalize() -> None:
+              url = os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://")
+              conn = await asyncpg.connect(url)
+              try:
+                  await conn.execute(
+                      "DROP EXTENSION IF EXISTS postgis CASCADE; "
+                      "DROP EXTENSION IF EXISTS btree_gist CASCADE; "
+                      "DROP EXTENSION IF EXISTS pgcrypto CASCADE;"
+                  )
+              finally:
+                  await conn.close()
+
+          asyncio.run(normalize())
+          PY
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+          python - <<'PY'
+          import asyncio
+          import os
+          import asyncpg
+
+          async def verify() -> None:
+              url = os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://")
+              conn = await asyncpg.connect(url)
+              try:
+                  rows = await conn.fetch(
+                      "SELECT e.extname, n.nspname "
+                      "FROM pg_extension AS e "
+                      "JOIN pg_namespace AS n ON n.oid = e.extnamespace "
+                      "WHERE e.extname IN ('postgis', 'btree_gist', 'pgcrypto')"
+                  )
+                  extensions = {(row["extname"], row["nspname"]) for row in rows}
+                  expected = {
+                      ("postgis", "extensions"),
+                      ("btree_gist", "extensions"),
+                      ("pgcrypto", "extensions"),
+                  }
+                  assert extensions == expected, extensions
+                  version = await conn.fetchval(
+                      "SELECT version_num FROM sthalo.alembic_version"
+                  )
+                  assert version == "20261026_0001", version
+              finally:
+                  await conn.close()
+
+          asyncio.run(verify())
+          PY
+
+      - name: Verify PostGIS and btree_gist
+        run: |
+          psql -h 127.0.0.1 -U postgres -d sthalo_test -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          SET LOCAL search_path = sthalo, public, extensions;
+          SELECT postgis_version();
+          DO $$
+          BEGIN
+            CREATE TEMP TABLE exclusion_probe (
+              resource_id integer NOT NULL,
+              period tstzrange NOT NULL,
+              EXCLUDE USING gist (resource_id WITH =, period WITH &&)
+            );
+            INSERT INTO exclusion_probe
+              VALUES (1, tstzrange('2026-01-01 10:00+00', '2026-01-01 11:00+00'));
+            BEGIN
+              INSERT INTO exclusion_probe
+                VALUES (1, tstzrange('2026-01-01 10:30+00', '2026-01-01 11:30+00'));
+              RAISE EXCEPTION 'expected overlap rejection did not occur';
+            EXCEPTION WHEN exclusion_violation THEN
+              RAISE NOTICE 'exclusion constraint rejected overlapping reservation';
+            END;
+          END $$;
+          ROLLBACK;
+          SQL
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type check
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Unit tests
+        working-directory: frontend
+        run: npm run test
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Check formatting
+        working-directory: frontend
+        run: npm run format:check
