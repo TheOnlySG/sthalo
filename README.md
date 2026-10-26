@@ -25,6 +25,8 @@ claims.
   auth trigger, profile/vehicle API calls with a Supabase JWT, invalid-token
   `401`, and cross-user vehicle access as `404`. FastAPI contains no password
   handling. Hosted demo login is still pending, so `G-V1` is not fully closed.
+- V1 CI is green on GitHub
+  ([run 40348810807](https://github.com/TheOnlySG/sthalo/actions/runs/40348810807)).
 - Next: finish hosted V1 when provider resources exist, otherwise start V2.
 - Hosted deployment: not started. No Render, Supabase, or Cloudflare Pages
   project has been created.
@@ -146,8 +148,8 @@ stores or submits passwords to FastAPI; Supabase Auth owns credentials.
 
 The CI workflow runs backend lint, format, type checks, unit tests, migrations
 up/down/up, integration tests, and the PostGIS/`btree_gist` probe, plus frontend
-lint, typecheck, tests, build, and formatting. V0 CI is green on GitHub, and the
-fresh-clone `G-V0` check passed.
+lint, typecheck, tests, build, and formatting. V0 CI is green, the fresh-clone
+`G-V0` check passed, and V1 CI is green.
 
 ## Hosted demo policy
 
