@@ -3,10 +3,11 @@
 FastAPI + async SQLAlchemy backend for the Sthalo Phase 1 parking MVP.
 
 The repository is being built in vertical slices. This checkpoint contains the
-application foundation, V1 identity/profile/owner-terms/vehicle APIs, and V2
-owner listings with private photos and admin moderation. Supabase Auth owns
-credentials; FastAPI verifies access tokens through JWKS and never handles
-passwords. Discovery, availability, and booking APIs arrive in later slices.
+application foundation, V1 identity/profile/owner-terms/vehicle APIs, V2 owner
+listings with private photos and admin moderation, and V3 public discovery
+search. Supabase Auth owns credentials; FastAPI verifies access tokens through
+JWKS and never handles passwords. Availability and booking APIs arrive in later
+slices.
 
 ## Configuration
 
@@ -78,13 +79,20 @@ token except where noted:
 - `POST /owner/parking-listings/{listing_id}/submit|pause|resume|archive`
 - `POST/PATCH/DELETE /owner/parking-listings/{listing_id}/photos[/{photo_id}]`
 - `GET /parking-listings/{listing_id}` (public, active listings only)
+- `GET /search/parking?lat=&lng=&radius_m=` or
+  `GET /search/parking?bbox=min_lng,min_lat,max_lng,max_lat` (public, active
+  listings only; also supports `vehicle_type`, `covered`, `max_price_paise`,
+  `sort=distance|price`, `limit`, and `cursor`)
 - `GET /admin/listings`, `GET /admin/listings/{listing_id}`
 - `POST /admin/listings/{listing_id}/approve|reject|suspend|restore`
 
-Public listing responses omit exact addresses, pincodes, and access
-instructions. Admin routes require `sthalo.users.is_admin = true`; a Supabase
-token role is never trusted for admin access. The `/health/live` and
-`/health/ready` endpoints are unauthenticated. Interactive docs are at `/docs`.
+Public listing and search responses omit exact addresses, pincodes, and access
+instructions. Search pins use the deterministic approximate public location and
+return straight-line distance in meters from the search center. Radius must be
+100–10,000 m; bounding boxes are capped at 0.5 degrees per side and 0.25 square
+degrees. Admin routes require `sthalo.users.is_admin = true`; a Supabase token
+role is never trusted for admin access. The `/health/live` and `/health/ready`
+endpoints are unauthenticated. Interactive docs are at `/docs`.
 
 ## Database migrations
 
@@ -106,9 +114,11 @@ Migration `20261026_0002` creates `sthalo.users`, `sthalo.vehicles`, the
 `auth.users`. Migration `20261026_0003` adds `sthalo.listings`,
 `parking_listings`, `resources`, `listing_photos`, `reservations`, and
 `audit_events`, including reservation overlap protection and deferred photo
-position swaps. A Supabase auth-user insert provisions the local profile;
-deleting the auth user cascades to profile-owned data. Integration tests expect a
-mock `auth.users` table in the test database.
+position swaps. Migration `20261026_0004` adds a partial GiST index for active
+public locations, a GIN index for supported vehicle types, and an expression
+index for effective price. A Supabase auth-user insert provisions the local
+profile; deleting the auth user cascades to profile-owned data. Integration tests
+expect a mock `auth.users` table in the test database.
 
 ## Checks
 

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth } from './auth/RequireAuth'
@@ -15,6 +16,11 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { VehiclesPage } from './pages/VehiclesPage'
 import { VerifyEmailPage } from './pages/VerifyEmailPage'
 
+const SearchPage = lazy(async () => {
+  const module = await import('./pages/SearchPage')
+  return { default: module.SearchPage }
+})
+
 function App() {
   return (
     <BrowserRouter>
@@ -26,6 +32,20 @@ function App() {
             <Route path="register" element={<RegisterPage />} />
             <Route path="verify-email" element={<VerifyEmailPage />} />
             <Route path="reset-password" element={<ResetPasswordPage />} />
+            <Route
+              path="search"
+              element={
+                <Suspense
+                  fallback={
+                    <p className="status-message" role="status">
+                      Loading the parking map…
+                    </p>
+                  }
+                >
+                  <SearchPage />
+                </Suspense>
+              }
+            />
             <Route path="parking/:listingId" element={<PublicListingPage />} />
             <Route element={<RequireAuth />}>
               <Route path="account/profile" element={<ProfilePage />} />

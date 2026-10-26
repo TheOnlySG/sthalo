@@ -31,8 +31,17 @@ claims.
   validated photos, moderation, lifecycle actions, public listing detail, and
   the local admin queue. The reservation schema needed by archive safety checks
   is in migration `20261026_0003`; booking APIs remain deferred.
+- V3 discovery is implemented locally: active-only radius and bounding-box
+  search, vehicle/covered/price filters, distance/price sorting, keyset cursor
+  pagination, privacy-safe approximate coordinates and distances, and an
+  OpenStreetMap/Leaflet search page with map/list selection. Migration
+  `20261026_0004` adds the active-location GiST, vehicle-type GIN, and effective
+  price indexes.
+- Availability-aware search (`P1-V3-03`) remains deferred until the V4
+  availability schema exists. Reverse geocoding (`P1-V3-05`) is intentionally
+  unused; the pin remains manual.
 - Hosted `G-V1` remains unverified because no hosted provider resources exist.
-  V2 proceeds as a local-only slice under that documented exception.
+  V2 and V3 proceed as local-only slices under that documented exception.
 - Hosted deployment: not started. No Render, Supabase, or Cloudflare Pages
   project has been created.
 - Payments, EV charging, reviews, disputes, and payouts: deferred.
@@ -93,8 +102,10 @@ schema is owned by Alembic. Baseline `20261026_0001` creates `sthalo` and
 `20261026_0002` adds `sthalo.users`, `sthalo.vehicles`, and the trigger that
 provisions a local profile for each Supabase auth user. Migration
 `20261026_0003` adds listings, parking attributes, resources, photos, audit
-events, and the reservation schema used by archive safety checks. Do not use
-`supabase db reset` as the application migration source.
+events, and the reservation schema used by archive safety checks. Migration
+`20261026_0004` adds discovery indexes for active public locations, supported
+vehicle types, and effective price. Do not use `supabase db reset` as the
+application migration source.
 
 ## Quick start
 
@@ -154,7 +165,10 @@ npm run format:check
    `UPDATE sthalo.users SET is_admin = true WHERE email = '<your-email>';`
    Then open `/admin/listings`, approve/reject/suspend/restore, and refresh the
    owner dashboard to see the result.
-7. Sign out from the header. Password reset also uses Mailpit and lands on
+7. Open `/search` to see approved listings on the OpenStreetMap view. Try a
+   radius search, filters, sorting, marker/list selection, and “Search this map
+   area” for a bounding-box search. Distances and pins are approximate.
+8. Sign out from the header. Password reset also uses Mailpit and lands on
    `/reset-password`, where the new password is set.
 
 The backend verifies Supabase access tokens against the local JWKS. Keep the
@@ -163,8 +177,9 @@ stores or submits passwords to FastAPI; Supabase Auth owns credentials.
 
 The CI workflow runs backend lint, format, type checks, unit tests, migrations
 up/down/up, integration tests, and the PostGIS/`btree_gist` probe, plus frontend
-lint, typecheck, tests, build, and formatting. V0 and V1 CI are green; V2 local
-checks cover the owner, photo, moderation, public-detail, and lifecycle flows.
+lint, typecheck, tests, build, and formatting. V0 and V1 CI are green. V2 and V3
+local checks cover listing/photos/moderation, public detail, lifecycle, search
+filters/pagination/privacy, and the map search page.
 
 ## Hosted demo policy
 

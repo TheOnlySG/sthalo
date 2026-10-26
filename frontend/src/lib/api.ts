@@ -9,6 +9,8 @@ import type {
   OwnerListing,
   OwnerListingSummary,
   ParkingInput,
+  ParkingSearchRequest,
+  ParkingSearchResponse,
   PublicListing,
   UserProfile,
   Vehicle,
@@ -226,6 +228,16 @@ export function deleteListingPhoto(listingId: string, photoId: string): Promise<
 
 export function getPublicListing(id: string): Promise<PublicListing> {
   return request<PublicListing>(`/parking-listings/${encodeURIComponent(id)}`)
+}
+
+export function searchParking(params: ParkingSearchRequest): Promise<ParkingSearchResponse> {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      query.set(key, String(value))
+    }
+  }
+  return request<ParkingSearchResponse>(`/search/parking?${query.toString()}`)
 }
 
 export function listAdminListings(status?: ListingStatus): Promise<AdminListing[]> {

@@ -108,6 +108,12 @@ class Listing(Base):
             "public_location",
             postgresql_using="gist",
         ),
+        Index(
+            "ix_listings_active_public_location_gist",
+            "public_location",
+            postgresql_using="gist",
+            postgresql_where=text("status = 'active'"),
+        ),
         {"schema": "sthalo"},
     )
 
@@ -269,6 +275,15 @@ class ParkingListing(Base):
         CheckConstraint(
             "advance_booking_max_days BETWEEN 1 AND 90",
             name="advance_days",
+        ),
+        Index(
+            "ix_parking_listings_supported_vehicle_types_gin",
+            "supported_vehicle_types",
+            postgresql_using="gin",
+        ),
+        Index(
+            "ix_parking_listings_effective_price",
+            text("(COALESCE(price_hourly_paise, price_daily_cap_paise))"),
         ),
         {"schema": "sthalo"},
     )

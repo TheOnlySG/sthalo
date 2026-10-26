@@ -9,26 +9,29 @@ export function HomePage() {
       <p className="eyebrow">Nashik · Phase 1 demo</p>
       <h1>Parking reservations, without the payment layer.</h1>
       <p className="lede">
-        Sthalo will connect drivers with private parking. This local demo now covers accounts,
-        vehicles, owner listings with private photos, and admin moderation. Availability and
-        reservations arrive in later slices.
+        Search active private parking on an approximate map, compare distance and price, then open a
+        privacy-safe listing. This local demo also covers accounts, vehicles, owner submissions,
+        photo moderation, and admin review.
       </p>
       <div className="hero-actions">
+        <Link className="button" to="/search">
+          Find parking
+        </Link>
         {session ? (
           <>
-            <Link className="button" to="/account/listings">
+            <Link className="button button-secondary" to="/account/listings">
               Manage parking listings
             </Link>
-            <Link className="button button-secondary" to="/account/profile">
+            <Link className="button button-quiet" to="/account/profile">
               Open your profile
             </Link>
           </>
         ) : (
           <>
-            <Link className="button" to="/login">
+            <Link className="button button-secondary" to="/login">
               Sign in
             </Link>
-            <Link className="button button-secondary" to="/register">
+            <Link className="button button-quiet" to="/register">
               Create a demo account
             </Link>
           </>
@@ -44,10 +47,10 @@ export function HomePage() {
           </p>
         </article>
         <article className="card">
-          <h2>Private photo pipeline</h2>
+          <h2>Map-first discovery</h2>
           <p>
-            Listing photos are validated and re-encoded, stored in a private bucket, and served with
-            short-lived signed URLs.
+            Radius and map-area searches use approximate pins, clear distances, and OpenStreetMap
+            tiles. Exact addresses stay private until a later reservation flow.
           </p>
         </article>
         <article className="card">

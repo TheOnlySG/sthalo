@@ -62,6 +62,9 @@ export function AppShell() {
           <NavLink className={navClassName} to="/" end>
             Home
           </NavLink>
+          <NavLink className={navClassName} to="/search">
+            Find parking
+          </NavLink>
           {session ? (
             <>
               <NavLink className={navClassName} to="/account/profile">

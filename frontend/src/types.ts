@@ -189,3 +189,45 @@ export type ListingCreateInput = ListingBasicsInput & {
   owner_terms_accepted: boolean
   parking: ParkingInput
 }
+
+export type SearchSort = 'distance' | 'price'
+export type SearchMode = 'radius' | 'bbox'
+
+export interface ParkingSearchItem {
+  id: string
+  title: string
+  description: string
+  latitude: number
+  longitude: number
+  locality: string
+  city: string
+  state: string
+  parking: ParkingPublic
+  cover_url: string | null
+  distance_m: number
+  updated_at: string
+}
+
+export interface ParkingSearchResponse {
+  items: ParkingSearchItem[]
+  next_cursor: string | null
+  mode: SearchMode
+  center_latitude: number
+  center_longitude: number
+  radius_m: number | null
+  bbox: number[] | null
+  sort: SearchSort
+}
+
+export interface ParkingSearchRequest {
+  lat?: number
+  lng?: number
+  radius_m?: number
+  bbox?: string
+  vehicle_type?: VehicleType
+  max_price_paise?: number
+  covered?: boolean
+  sort: SearchSort
+  limit: number
+  cursor?: string
+}

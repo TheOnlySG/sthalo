@@ -8,3 +8,10 @@ export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim() || 'http:/
 
 export const SUPABASE_ANON_KEY =
   import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() || 'local-anon-key-placeholder'
+
+export const TILE_URL =
+  import.meta.env.VITE_TILE_URL?.trim() || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+
+export const TILE_ATTRIBUTION =
+  import.meta.env.VITE_TILE_ATTRIBUTION?.trim() ||
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

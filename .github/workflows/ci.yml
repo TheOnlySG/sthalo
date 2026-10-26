@@ -163,7 +163,7 @@ jobs:
                   version = await conn.fetchval(
                       "SELECT version_num FROM sthalo.alembic_version"
                   )
-                  assert version == "20261026_0003", version
+                  assert version == "20261026_0004", version
                   tables = {
                       await conn.fetchval("SELECT to_regclass('sthalo.users')"),
                       await conn.fetchval("SELECT to_regclass('sthalo.vehicles')"),
@@ -197,6 +197,29 @@ jobs:
                       "AND conrelid = 'sthalo.listing_photos'::regclass"
                   )
                   assert deferred_photo_position is True, deferred_photo_position
+                  discovery_indexes = {
+                      row["indexname"]
+                      for row in await conn.fetch(
+                          "SELECT indexname FROM pg_indexes "
+                          "WHERE schemaname = 'sthalo' AND indexname = ANY($1::text[])",
+                          [
+                              "ix_listings_active_public_location_gist",
+                              "ix_parking_listings_supported_vehicle_types_gin",
+                              "ix_parking_listings_effective_price",
+                          ],
+                      )
+                  }
+                  assert discovery_indexes == {
+                      "ix_listings_active_public_location_gist",
+                      "ix_parking_listings_supported_vehicle_types_gin",
+                      "ix_parking_listings_effective_price",
+                  }, discovery_indexes
+                  active_location_index = await conn.fetchval(
+                      "SELECT indexdef FROM pg_indexes "
+                      "WHERE schemaname = 'sthalo' "
+                      "AND indexname = 'ix_listings_active_public_location_gist'"
+                  )
+                  assert "WHERE (status = 'active'::text)" in active_location_index
                   trigger = await conn.fetchval(
                       "SELECT 1 FROM pg_trigger "
                       "WHERE tgrelid = 'auth.users'::regclass "
