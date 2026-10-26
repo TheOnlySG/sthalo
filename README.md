@@ -8,15 +8,17 @@ claims.
 
 - Foundation: `P1-V0-02` decision lock, `P1-V0-03` scaffold, and `P1-V0-04`
   local Supabase stack are complete.
-- `P1-V0-05` CI workflow is created and locally validated; remote verification
-  is pending.
+- `P1-V0-05` CI is green on GitHub
+  ([run 40341378459](https://github.com/TheOnlySG/sthalo/actions/runs/40341378459)).
 - `P1-V0-06` application factory, configuration, structured logging, request
   IDs, error envelopes, CORS, and health endpoints are complete.
 - `P1-V0-07` async SQLAlchemy engine/session, Alembic baseline
   (`20261026_0001`), and `sthalo`/`extensions` schemas are complete.
 - `P1-V0-08` local setup and README are complete.
-- Next: push to GitHub for remote CI and run the fresh-clone `G-V0` check; V1
-  starts only after `G-V0` passes.
+- `G-V0` passed: a fresh clone installed both apps, ran all backend/frontend
+  checks, applied migrations up/down/up to a clean database, served `/health/live`
+  and `/health/ready` as `200`, and served the built frontend as `200`.
+- Next: start V1 feature implementation.
 - Hosted deployment: not started. No Render, Supabase, or Cloudflare Pages
   project has been created.
 - Payments, EV charging, reviews, disputes, and payouts: deferred.
@@ -27,7 +29,7 @@ claims.
 backend/    FastAPI + async SQLAlchemy scaffold
 frontend/   React + Vite + TypeScript scaffold
 supabase/   Local Supabase configuration (Mailpit, Auth, Storage)
-.github/    CI workflow (remote run pending)
+.github/    CI workflow
 ```
 
 ## Local Supabase
@@ -111,8 +113,9 @@ npm run build
 ```
 
 The CI workflow runs the backend checks, a clean PostGIS/`btree_gist` probe, and
-the frontend checks, including Alembic up/down/up. It has been validated locally
-but not on GitHub. Feature routes and auth flows arrive in later tasks.
+the frontend checks, including Alembic up/down/up. It is green on GitHub, and the
+fresh-clone `G-V0` check passed. Feature routes and auth flows arrive in later
+tasks.
 
 ## Hosted demo policy
 
