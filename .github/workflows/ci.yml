@@ -163,7 +163,7 @@ jobs:
                   version = await conn.fetchval(
                       "SELECT version_num FROM sthalo.alembic_version"
                   )
-                  assert version == "20261026_0004", version
+                  assert version == "20261026_0005", version
                   tables = {
                       await conn.fetchval("SELECT to_regclass('sthalo.users')"),
                       await conn.fetchval("SELECT to_regclass('sthalo.vehicles')"),
@@ -173,6 +173,8 @@ jobs:
                       await conn.fetchval("SELECT to_regclass('sthalo.listing_photos')"),
                       await conn.fetchval("SELECT to_regclass('sthalo.reservations')"),
                       await conn.fetchval("SELECT to_regclass('sthalo.audit_events')"),
+                      await conn.fetchval("SELECT to_regclass('sthalo.availability_rules')"),
+                      await conn.fetchval("SELECT to_regclass('sthalo.blocked_intervals')"),
                   }
                   expected_tables = {
                       "sthalo.users",
@@ -183,6 +185,8 @@ jobs:
                       "sthalo.listing_photos",
                       "sthalo.reservations",
                       "sthalo.audit_events",
+                      "sthalo.availability_rules",
+                      "sthalo.blocked_intervals",
                   }
                   assert tables == expected_tables, tables
                   reservation_exclusion = await conn.fetchval(
@@ -191,6 +195,12 @@ jobs:
                       "AND conrelid = 'sthalo.reservations'::regclass"
                   )
                   assert reservation_exclusion == 1, reservation_exclusion
+                  block_exclusion = await conn.fetchval(
+                      "SELECT 1 FROM pg_constraint "
+                      "WHERE conname = 'ex_blocked_intervals_no_overlap' "
+                      "AND conrelid = 'sthalo.blocked_intervals'::regclass"
+                  )
+                  assert block_exclusion == 1, block_exclusion
                   deferred_photo_position = await conn.fetchval(
                       "SELECT condeferrable AND condeferred FROM pg_constraint "
                       "WHERE conname = 'uq_listing_photos_position' "
@@ -220,6 +230,21 @@ jobs:
                       "AND indexname = 'ix_listings_active_public_location_gist'"
                   )
                   assert "WHERE (status = 'active'::text)" in active_location_index
+                  availability_indexes = {
+                      row["indexname"]
+                      for row in await conn.fetch(
+                          "SELECT indexname FROM pg_indexes "
+                          "WHERE schemaname = 'sthalo' AND indexname = ANY($1::text[])",
+                          [
+                              "ix_availability_rules_listing_weekday",
+                              "ix_blocked_intervals_resource_start",
+                          ],
+                      )
+                  }
+                  assert availability_indexes == {
+                      "ix_availability_rules_listing_weekday",
+                      "ix_blocked_intervals_resource_start",
+                  }, availability_indexes
                   trigger = await conn.fetchval(
                       "SELECT 1 FROM pg_trigger "
                       "WHERE tgrelid = 'auth.users'::regclass "

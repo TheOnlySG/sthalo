@@ -2,6 +2,10 @@ import { supabase } from './supabase'
 import { API_BASE_URL } from './env'
 import type {
   AdminListing,
+  AvailabilityResponse,
+  AvailabilityRule,
+  AvailabilityRuleInput,
+  BlockedInterval,
   ListingBasicsInput,
   ListingCreateInput,
   ListingPhoto,
@@ -63,7 +67,7 @@ function isApiErrorPayload(value: unknown): value is ApiErrorPayload {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
 }
 
@@ -228,6 +232,54 @@ export function deleteListingPhoto(listingId: string, photoId: string): Promise<
 
 export function getPublicListing(id: string): Promise<PublicListing> {
   return request<PublicListing>(`/parking-listings/${encodeURIComponent(id)}`)
+}
+
+export function getListingAvailability(
+  id: string,
+  from: string,
+  to: string,
+): Promise<AvailabilityResponse> {
+  const query = new URLSearchParams({ from, to })
+  return request<AvailabilityResponse>(
+    `/parking-listings/${encodeURIComponent(id)}/availability?${query.toString()}`,
+  )
+}
+
+export function getAvailabilityRules(id: string): Promise<AvailabilityRule[]> {
+  return request<AvailabilityRule[]>(
+    `/owner/parking-listings/${encodeURIComponent(id)}/availability-rules`,
+  )
+}
+
+export function replaceAvailabilityRules(
+  id: string,
+  rules: AvailabilityRuleInput[],
+): Promise<AvailabilityRule[]> {
+  return request<AvailabilityRule[]>(
+    `/owner/parking-listings/${encodeURIComponent(id)}/availability-rules`,
+    { method: 'PUT', body: { rules } },
+  )
+}
+
+export function listBlockedIntervals(id: string): Promise<BlockedInterval[]> {
+  return request<BlockedInterval[]>(`/owner/parking-listings/${encodeURIComponent(id)}/blocks`)
+}
+
+export function createBlockedInterval(
+  id: string,
+  values: { start: string; end: string; reason: string | null },
+): Promise<BlockedInterval> {
+  return request<BlockedInterval>(`/owner/parking-listings/${encodeURIComponent(id)}/blocks`, {
+    method: 'POST',
+    body: values,
+  })
+}
+
+export function deleteBlockedInterval(id: string, blockId: string): Promise<void> {
+  return request<void>(
+    `/owner/parking-listings/${encodeURIComponent(id)}/blocks/${encodeURIComponent(blockId)}`,
+    { method: 'DELETE' },
+  )
 }
 
 export function searchParking(params: ParkingSearchRequest): Promise<ParkingSearchResponse> {

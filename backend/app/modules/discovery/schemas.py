@@ -9,6 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.modules.availability.schemas import validate_window
 from app.modules.listings.schemas import ParkingPublicRead
 from app.modules.profiles.models import VehicleType
 
@@ -39,6 +40,8 @@ class ParkingSearchParams(BaseModel):
     sort: SearchSort = SearchSort.DISTANCE
     limit: int = Field(default=20, ge=1, le=50)
     cursor: str | None = Field(default=None, max_length=512)
+    start: datetime | None = None
+    end: datetime | None = None
 
     bbox_bounds: tuple[float, float, float, float] | None = Field(
         default=None,
@@ -84,6 +87,20 @@ class ParkingSearchParams(BaseModel):
         if self.latitude is None or self.longitude is None:
             raise ValueError("Provide lat and lng, or bbox")
         return self
+
+    @model_validator(mode="after")
+    def validate_availability(self) -> Self:
+        if (self.start is None) != (self.end is None):
+            raise ValueError("Provide both start and end, or neither")
+        if self.start is not None and self.end is not None:
+            validate_window(self.start, self.end)
+        return self
+
+    @property
+    def availability_window(self) -> tuple[datetime, datetime] | None:
+        if self.start is None or self.end is None:
+            return None
+        return self.start, self.end
 
     @property
     def mode(self) -> SearchMode:

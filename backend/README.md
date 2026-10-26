@@ -79,10 +79,16 @@ token except where noted:
 - `POST /owner/parking-listings/{listing_id}/submit|pause|resume|archive`
 - `POST/PATCH/DELETE /owner/parking-listings/{listing_id}/photos[/{photo_id}]`
 - `GET /parking-listings/{listing_id}` (public, active listings only)
+- `GET /parking-listings/{listing_id}/availability?from=&to=` (public, active
+  listings only; 31-day maximum, 15-minute boundaries)
+- `GET/PUT /owner/parking-listings/{listing_id}/availability-rules`
+- `GET/POST /owner/parking-listings/{listing_id}/blocks`
+- `DELETE /owner/parking-listings/{listing_id}/blocks/{block_id}`
 - `GET /search/parking?lat=&lng=&radius_m=` or
   `GET /search/parking?bbox=min_lng,min_lat,max_lng,max_lat` (public, active
   listings only; also supports `vehicle_type`, `covered`, `max_price_paise`,
-  `sort=distance|price`, `limit`, and `cursor`)
+  `sort=distance|price`, `limit`, `cursor`, and an optional `start`/`end`
+  availability window)
 - `GET /admin/listings`, `GET /admin/listings/{listing_id}`
 - `POST /admin/listings/{listing_id}/approve|reject|suspend|restore`
 
@@ -116,9 +122,11 @@ Migration `20261026_0002` creates `sthalo.users`, `sthalo.vehicles`, the
 `audit_events`, including reservation overlap protection and deferred photo
 position swaps. Migration `20261026_0004` adds a partial GiST index for active
 public locations, a GIN index for supported vehicle types, and an expression
-index for effective price. A Supabase auth-user insert provisions the local
-profile; deleting the auth user cascades to profile-owned data. Integration tests
-expect a mock `auth.users` table in the test database.
+index for effective price. Migration `20261026_0005` adds weekly availability
+rules and blocked intervals, including a GiST exclusion constraint that prevents
+overlapping blocks on a resource. A Supabase auth-user insert provisions the
+local profile; deleting the auth user cascades to profile-owned data. Integration
+tests expect a mock `auth.users` table in the test database.
 
 ## Checks
 

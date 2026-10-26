@@ -7,6 +7,7 @@ import { AdminListingsPage } from './pages/AdminListingsPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { OwnerAvailabilityPage } from './pages/OwnerAvailabilityPage'
 import { OwnerListingEditorPage } from './pages/OwnerListingEditorPage'
 import { OwnerListingsPage } from './pages/OwnerListingsPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -53,6 +54,10 @@ function App() {
               <Route path="account/listings" element={<OwnerListingsPage />} />
               <Route path="account/listings/new" element={<OwnerListingEditorPage />} />
               <Route path="account/listings/:listingId/edit" element={<OwnerListingEditorPage />} />
+              <Route
+                path="account/listings/:listingId/availability"
+                element={<OwnerAvailabilityPage />}
+              />
               <Route path="admin/listings" element={<AdminListingsPage />} />
             </Route>
             <Route path="*" element={<NotFoundPage />} />

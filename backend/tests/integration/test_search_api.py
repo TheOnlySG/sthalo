@@ -344,3 +344,116 @@ def test_cursor_pagination_is_stable(
     )
     assert [item["id"] for item in second["items"]] == [created[2]["id"]]
     assert second["next_cursor"] is None
+
+
+def test_search_with_window_excludes_listings_without_matching_rules(
+    client: TestClient,
+    auth_user_factory: Callable[..., TestUser],
+    token_for: Callable[..., str],
+    db_execute: Callable[..., str],
+) -> None:
+    owner = auth_user_factory()
+    token = token_for(owner)
+    _accept_terms(client, token)
+    admin = _make_admin(db_execute, auth_user_factory)
+    admin_token = token_for(admin)
+
+    available = _nearby_listing(
+        client,
+        token,
+        admin_token,
+        title="Monday morning bay",
+        latitude=CENTER_LAT,
+        longitude=CENTER_LNG,
+        parking=_parking(),
+    )
+    _nearby_listing(
+        client,
+        token,
+        admin_token,
+        title="No availability bay",
+        latitude=CENTER_LAT,
+        longitude=CENTER_LNG,
+        parking=_parking(),
+    )
+    rules = client.put(
+        f"{BASE}/owner/parking-listings/{available['id']}/availability-rules",
+        headers=_headers(token),
+        json={"rules": [{"weekday": 1, "start_time": "09:00:00", "end_time": "12:00:00"}]},
+    )
+    assert rules.status_code == 200, rules.text
+
+    result = _search(
+        client,
+        **CENTER,
+        radius_m=1_000,
+        start="2026-11-02T04:00:00Z",
+        end="2026-11-02T05:00:00Z",
+    )
+
+    assert [item["id"] for item in result["items"]] == [available["id"]]
+
+
+def test_windowed_search_paginates_across_cursor(
+    client: TestClient,
+    auth_user_factory: Callable[..., TestUser],
+    token_for: Callable[..., str],
+    db_execute: Callable[..., str],
+) -> None:
+    owner = auth_user_factory()
+    token = token_for(owner)
+    _accept_terms(client, token)
+    admin = _make_admin(db_execute, auth_user_factory)
+    admin_token = token_for(admin)
+    listings = [
+        _nearby_listing(
+            client,
+            token,
+            admin_token,
+            title="Monday bay one",
+            latitude=CENTER_LAT,
+            longitude=CENTER_LNG,
+            parking=_parking(),
+        ),
+        _nearby_listing(
+            client,
+            token,
+            admin_token,
+            title="Monday bay two",
+            latitude=CENTER_LAT + 0.0002,
+            longitude=CENTER_LNG + 0.0002,
+            parking=_parking(),
+        ),
+    ]
+    for listing in listings:
+        response = client.put(
+            f"{BASE}/owner/parking-listings/{listing['id']}/availability-rules",
+            headers=_headers(token),
+            json={"rules": [{"weekday": 1, "start_time": "09:00:00", "end_time": "12:00:00"}]},
+        )
+        assert response.status_code == 200, response.text
+
+    first = _search(
+        client,
+        **CENTER,
+        radius_m=1_000,
+        limit=1,
+        start="2026-11-02T04:00:00Z",
+        end="2026-11-02T05:00:00Z",
+    )
+    assert len(first["items"]) == 1
+    assert first["next_cursor"] is not None
+
+    second = _search(
+        client,
+        **CENTER,
+        radius_m=1_000,
+        limit=1,
+        cursor=first["next_cursor"],
+        start="2026-11-02T04:00:00Z",
+        end="2026-11-02T05:00:00Z",
+    )
+
+    assert len(second["items"]) == 1
+    assert second["next_cursor"] is None
+    assert second["items"][0]["id"] != first["items"][0]["id"]

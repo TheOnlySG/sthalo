@@ -42,6 +42,8 @@ interface Filters {
   covered: '' | 'true' | 'false'
   maxPriceRupees: string
   sort: SearchSort
+  availableFrom: string
+  availableTo: string
 }
 
 const INITIAL_FILTERS: Filters = {
@@ -50,6 +52,12 @@ const INITIAL_FILTERS: Filters = {
   covered: '',
   maxPriceRupees: '',
   sort: 'distance',
+  availableFrom: '',
+  availableTo: '',
+}
+
+function istLocalToIso(value: string): string {
+  return new Date(`${value}:00+05:30`).toISOString()
 }
 
 function filtersToRequest(filters: Filters): ParkingSearchRequest {
@@ -64,7 +72,24 @@ function filtersToRequest(filters: Filters): ParkingSearchRequest {
   if (filters.maxPriceRupees.trim() && Number.isFinite(maxPrice) && maxPrice >= 0) {
     request.max_price_paise = Math.round(maxPrice * 100)
   }
+  if (filters.availableFrom && filters.availableTo) {
+    request.start = istLocalToIso(filters.availableFrom)
+    request.end = istLocalToIso(filters.availableTo)
+  }
   return request
+}
+
+function availabilityWindowError(filters: Filters): string | null {
+  if (!filters.availableFrom && !filters.availableTo) {
+    return null
+  }
+  if (!filters.availableFrom || !filters.availableTo) {
+    return 'Choose both an availability start and end time, or leave both blank.'
+  }
+  if (filters.availableTo <= filters.availableFrom) {
+    return 'Availability end must be after start.'
+  }
+  return null
 }
 
 function formatDistance(distanceM: number): string {
@@ -234,6 +259,11 @@ export function SearchPage() {
 
   function handleApply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const windowError = availabilityWindowError(filters)
+    if (windowError) {
+      setError(windowError)
+      return
+    }
     applyParams({
       lat: DEFAULT_CENTER.lat,
       lng: DEFAULT_CENTER.lng,
@@ -245,6 +275,11 @@ export function SearchPage() {
   function handleSearchArea() {
     const map = mapRef.current
     if (!map) {
+      return
+    }
+    const windowError = availabilityWindowError(filters)
+    if (windowError) {
+      setError(windowError)
       return
     }
     const bounds = map.getBounds()
@@ -385,6 +420,28 @@ export function SearchPage() {
               <option value="distance">Distance</option>
               <option value="price">Price</option>
             </select>
+          </label>
+          <label className="field">
+            Available from (IST)
+            <input
+              type="datetime-local"
+              step="900"
+              value={filters.availableFrom}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, availableFrom: event.target.value }))
+              }
+            />
+          </label>
+          <label className="field">
+            Available until (IST)
+            <input
+              type="datetime-local"
+              step="900"
+              value={filters.availableTo}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, availableTo: event.target.value }))
+              }
+            />
           </label>
         </div>
         <div className="header-actions">

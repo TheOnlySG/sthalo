@@ -19,6 +19,7 @@ from sqlalchemy.orm import contains_eager, lazyload, selectinload
 
 from app.core.errors import AppError, ErrorCode
 from app.integrations.storage.supabase import PhotoStorage, PhotoStorageError
+from app.modules.availability.service import available_listing_ids
 from app.modules.discovery.schemas import (
     ParkingSearchParams,
     ParkingSearchResponse,
@@ -101,7 +102,8 @@ async def search_parking_listings(
     if params.covered is not None:
         statement = statement.where(ParkingListing.is_covered.is_(params.covered))
 
-    if params.cursor is not None:
+    availability_window = params.availability_window
+    if params.cursor is not None and availability_window is None:
         cursor = _decode_cursor(params.cursor, params.sort)
         if params.sort == SearchSort.DISTANCE:
             statement = statement.where(
@@ -123,11 +125,9 @@ async def search_parking_listings(
     else:
         statement = statement.order_by(price.asc(), Listing.id.asc())
 
-    raw_rows = list(
-        await session.execute(
-            statement.limit(params.limit + 1).execution_options(populate_existing=True)
-        )
-    )
+    if availability_window is None:
+        statement = statement.limit(params.limit + 1)
+    raw_rows = list(await session.execute(statement.execution_options(populate_existing=True)))
     rows: list[tuple[Listing, float, int, float, float]] = [
         (
             type_cast(Listing, row[0]),
@@ -138,6 +138,16 @@ async def search_parking_listings(
         )
         for row in raw_rows
     ]
+    if availability_window is not None:
+        if params.cursor is not None:
+            cursor = _decode_cursor(params.cursor, params.sort)
+            rows = [row for row in rows if _after_cursor(row, params.sort, cursor)]
+        available = await available_listing_ids(
+            session,
+            [row[0].id for row in rows],
+            *availability_window,
+        )
+        rows = [row for row in rows if row[0].id in available]
     page = rows[: params.limit]
     next_cursor = None
     if len(rows) > params.limit and page:
@@ -168,6 +178,15 @@ async def search_parking_listings(
         bbox=list(params.bbox_bounds) if params.bbox_bounds is not None else None,
         sort=params.sort,
     )
+
+
+def _after_cursor(
+    row: tuple[Listing, float, int, float, float],
+    sort: SearchSort,
+    cursor: SearchCursor,
+) -> bool:
+    value: float | int = float(row[1]) if sort == SearchSort.DISTANCE else int(row[2])
+    return value > cursor.value or (value == cursor.value and row[0].id > cursor.listing_id)
 
 
 def _search_item(

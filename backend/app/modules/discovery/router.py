@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -37,6 +38,8 @@ async def search_parking(
     sort: Annotated[SearchSort, Query()] = SearchSort.DISTANCE,
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
     cursor: Annotated[str | None, Query(max_length=512)] = None,
+    start: Annotated[datetime | None, Query()] = None,
+    end: Annotated[datetime | None, Query()] = None,
 ) -> ParkingSearchResponse:
     try:
         params = ParkingSearchParams(
@@ -50,6 +53,8 @@ async def search_parking(
             sort=sort,
             limit=limit,
             cursor=cursor,
+            start=start,
+            end=end,
         )
     except ValidationError as exc:
         errors = []

@@ -230,4 +230,44 @@ export interface ParkingSearchRequest {
   sort: SearchSort
   limit: number
   cursor?: string
+  start?: string
+  end?: string
+}
+
+export interface AvailabilityRule {
+  id: string
+  weekday: number
+  start_time: string
+  end_time: string
+  valid_from: string | null
+  valid_to: string | null
+}
+
+export interface AvailabilityRuleInput {
+  weekday: number
+  start_time: string
+  end_time: string
+  valid_from: string | null
+  valid_to: string | null
+}
+
+export interface BlockedInterval {
+  id: string
+  start: string
+  end: string
+  reason: string | null
+  created_at: string
+}
+
+export interface AvailabilityWindow {
+  start: string
+  end: string
+}
+
+export interface AvailabilityResponse {
+  listing_id: string
+  timezone: string
+  from: string
+  to: string
+  windows: AvailabilityWindow[]
 }

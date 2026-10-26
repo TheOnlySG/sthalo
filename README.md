@@ -37,11 +37,17 @@ claims.
   OpenStreetMap/Leaflet search page with map/list selection. Migration
   `20261026_0004` adds the active-location GiST, vehicle-type GIN, and effective
   price indexes.
-- Availability-aware search (`P1-V3-03`) remains deferred until the V4
-  availability schema exists. Reverse geocoding (`P1-V3-05`) is intentionally
-  unused; the pin remains manual.
+- V4 availability is implemented locally: owner weekly rules, one-off blocked
+  intervals with overlap protection, deterministic 15-minute availability
+  windows in the listing timezone, block-vs-booking conflict checks, a public
+  advisory availability API, availability-aware search windows, and an owner
+  availability editor. Migration `20261026_0005` adds the new tables and
+  exclusion constraint.
+- Availability-aware search (`P1-V3-03`) is now covered by the V4 window
+  filter. Reverse geocoding (`P1-V3-05`) is intentionally unused; the pin
+  remains manual. Reservation creation APIs remain deferred to V5.
 - Hosted `G-V1` remains unverified because no hosted provider resources exist.
-  V2 and V3 proceed as local-only slices under that documented exception.
+  V2, V3, and V4 proceed as local-only slices under that documented exception.
 - Hosted deployment: not started. No Render, Supabase, or Cloudflare Pages
   project has been created.
 - Payments, EV charging, reviews, disputes, and payouts: deferred.
@@ -104,8 +110,9 @@ provisions a local profile for each Supabase auth user. Migration
 `20261026_0003` adds listings, parking attributes, resources, photos, audit
 events, and the reservation schema used by archive safety checks. Migration
 `20261026_0004` adds discovery indexes for active public locations, supported
-vehicle types, and effective price. Do not use `supabase db reset` as the
-application migration source.
+vehicle types, and effective price. Migration `20261026_0005` adds owner
+availability rules, blocked intervals, and the block-overlap exclusion
+constraint. Do not use `supabase db reset` as the application migration source.
 
 ## Quick start
 
@@ -168,7 +175,9 @@ npm run format:check
 7. Open `/search` to see approved listings on the OpenStreetMap view. Try a
    radius search, filters, sorting, marker/list selection, and “Search this map
    area” for a bounding-box search. Distances and pins are approximate.
-8. Sign out from the header. Password reset also uses Mailpit and lands on
+8. From `/account/listings`, open **Availability** to add weekly windows and
+   one-off IST blocks. Public availability is advisory until booking APIs land.
+9. Sign out from the header. Password reset also uses Mailpit and lands on
    `/reset-password`, where the new password is set.
 
 The backend verifies Supabase access tokens against the local JWKS. Keep the
@@ -177,9 +186,10 @@ stores or submits passwords to FastAPI; Supabase Auth owns credentials.
 
 The CI workflow runs backend lint, format, type checks, unit tests, migrations
 up/down/up, integration tests, and the PostGIS/`btree_gist` probe, plus frontend
-lint, typecheck, tests, build, and formatting. V0 and V1 CI are green. V2 and V3
+lint, typecheck, tests, build, and formatting. V0 and V1 CI are green. V2–V4
 local checks cover listing/photos/moderation, public detail, lifecycle, search
-filters/pagination/privacy, and the map search page.
+filters/pagination/privacy, the map search page, availability rules/blocks,
+timezone/window computation, and block-vs-booking conflicts.
 
 ## Hosted demo policy
 

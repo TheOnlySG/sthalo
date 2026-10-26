@@ -134,6 +134,12 @@ export function OwnerListingsPage() {
                   >
                     Manage
                   </Link>
+                  <Link
+                    className="button button-small button-secondary"
+                    to={`/account/listings/${listing.id}/availability`}
+                  >
+                    Availability
+                  </Link>
                   {listing.status === 'active' ? (
                     <Link className="button button-small" to={`/parking/${listing.id}`}>
                       View public page
