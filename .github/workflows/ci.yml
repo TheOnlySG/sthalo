@@ -83,7 +83,7 @@ jobs:
 
       - name: Unit tests
         working-directory: backend
-        run: pytest
+        run: pytest tests/unit
 
       - name: Install PostgreSQL client
         run: |
@@ -100,6 +100,18 @@ jobs:
           done
           psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'drop database if exists sthalo_test;'
           psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'create database sthalo_test;'
+
+      - name: Prepare Supabase auth schema
+        run: |
+          psql -h 127.0.0.1 -U postgres -d sthalo_test -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE SCHEMA IF NOT EXISTS auth;
+          CREATE TABLE IF NOT EXISTS auth.users (
+            id uuid PRIMARY KEY,
+            email text,
+            raw_user_meta_data jsonb NOT NULL DEFAULT '{}'::jsonb,
+            email_confirmed_at timestamptz
+          );
+          SQL
 
       - name: Run migrations up/down/up
         working-directory: backend
@@ -151,12 +163,27 @@ jobs:
                   version = await conn.fetchval(
                       "SELECT version_num FROM sthalo.alembic_version"
                   )
-                  assert version == "20261026_0001", version
+                  assert version == "20261026_0002", version
+                  tables = {
+                      await conn.fetchval("SELECT to_regclass('sthalo.users')"),
+                      await conn.fetchval("SELECT to_regclass('sthalo.vehicles')"),
+                  }
+                  assert tables == {"sthalo.users", "sthalo.vehicles"}, tables
+                  trigger = await conn.fetchval(
+                      "SELECT 1 FROM pg_trigger "
+                      "WHERE tgrelid = 'auth.users'::regclass "
+                      "AND tgname = 'trg_auth_users_create_profile'"
+                  )
+                  assert trigger == 1, trigger
               finally:
                   await conn.close()
 
           asyncio.run(verify())
           PY
+
+      - name: Integration tests
+        working-directory: backend
+        run: pytest tests/integration
 
       - name: Verify PostGIS and btree_gist
         run: |

@@ -18,7 +18,14 @@ claims.
 - `G-V0` passed: a fresh clone installed both apps, ran all backend/frontend
   checks, applied migrations up/down/up to a clean database, served `/health/live`
   and `/health/ready` as `200`, and served the built frontend as `200`.
-- Next: start V1 feature implementation.
+- V1 identity, profiles, and vehicles are implemented locally: Supabase signup,
+  Mailpit confirmation, login/logout, password reset, JWT-protected profile and
+  owner-terms APIs, and private vehicle CRUD.
+- Local `G-V1` checks pass: real signup/login/logout, profile provisioning by the
+  auth trigger, profile/vehicle API calls with a Supabase JWT, invalid-token
+  `401`, and cross-user vehicle access as `404`. FastAPI contains no password
+  handling. Hosted demo login is still pending, so `G-V1` is not fully closed.
+- Next: finish hosted V1 when provider resources exist, otherwise start V2.
 - Hosted deployment: not started. No Render, Supabase, or Cloudflare Pages
   project has been created.
 - Payments, EV charging, reviews, disputes, and payouts: deferred.
@@ -26,8 +33,8 @@ claims.
 ## Repository layout
 
 ```text
-backend/    FastAPI + async SQLAlchemy scaffold
-frontend/   React + Vite + TypeScript scaffold
+backend/    FastAPI + async SQLAlchemy + Alembic API
+frontend/   React + Vite + TypeScript application
 supabase/   Local Supabase configuration (Mailpit, Auth, Storage)
 .github/    CI workflow
 ```
@@ -74,11 +81,13 @@ npx --yes supabase@2.122.0 stop
 ```
 
 `supabase/config.toml` owns the local stack configuration. The application
-schema is owned by Alembic; baseline `20261026_0001` creates `sthalo` and
-`extensions` and installs PostGIS, `btree_gist`, and `pgcrypto`. Do not use
+schema is owned by Alembic. Baseline `20261026_0001` creates `sthalo` and
+`extensions` and installs PostGIS, `btree_gist`, and `pgcrypto`; migration
+`20261026_0002` adds `sthalo.users`, `sthalo.vehicles`, and the trigger that
+provisions a local profile for each Supabase auth user. Do not use
 `supabase db reset` as the application migration source.
 
-## Quick start (foundation)
+## Quick start
 
 Backend:
 
@@ -92,7 +101,8 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 Health checks: `GET /health/live` and `GET /health/ready` on
-`http://127.0.0.1:8000`. Readiness requires the Alembic baseline. Backend checks:
+`http://127.0.0.1:8000`. Readiness requires the current Alembic head. API docs are
+at `http://127.0.0.1:8000/docs`. Backend checks:
 
 ```bash
 ruff check .
@@ -106,16 +116,38 @@ Frontend:
 ```bash
 cd frontend
 npm install
+npm run dev
+```
+
+Open `http://localhost:5173`. Frontend checks:
+
+```bash
 npm run lint
 npm run typecheck
 npm run test
 npm run build
+npm run format:check
 ```
 
-The CI workflow runs the backend checks, a clean PostGIS/`btree_gist` probe, and
-the frontend checks, including Alembic up/down/up. It is green on GitHub, and the
-fresh-clone `G-V0` check passed. Feature routes and auth flows arrive in later
-tasks.
+### Local auth walkthrough
+
+1. Open `/register`, enter a demo name, demo email, and a password of at least
+   eight characters with letters and digits.
+2. Open Mailpit at `http://127.0.0.1:54324`, find the confirmation message, and
+   open its link.
+3. Sign in at `/login`. The auth trigger creates the local profile.
+4. Edit the profile, accept owner terms, and add/edit/remove up to ten vehicles.
+5. Sign out from the header. Password reset also uses Mailpit and lands on
+   `/reset-password`, where the new password is set.
+
+The backend verifies Supabase access tokens against the local JWKS. Keep the
+frontend `VITE_API_BASE_URL` origin in backend `CORS_ORIGINS`. The frontend never
+stores or submits passwords to FastAPI; Supabase Auth owns credentials.
+
+The CI workflow runs backend lint, format, type checks, unit tests, migrations
+up/down/up, integration tests, and the PostGIS/`btree_gist` probe, plus frontend
+lint, typecheck, tests, build, and formatting. V0 CI is green on GitHub, and the
+fresh-clone `G-V0` check passed.
 
 ## Hosted demo policy
 

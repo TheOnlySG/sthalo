@@ -6,7 +6,7 @@ import os
 
 os.environ.setdefault("ENV", "test")
 os.environ.setdefault(
-    "DATABASE_URL", "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/sthalo_test"
+    "DATABASE_URL", "postgresql+asyncpg://postgres:postgres@127.0.0.1:54322/sthalo_test"
 )
 os.environ.setdefault("SUPABASE_URL", "http://127.0.0.1:54321")
 os.environ.setdefault("SUPABASE_ANON_KEY", "test-anon-key")
