@@ -11,6 +11,10 @@ from app.core.config import Environment, Settings
 def base_settings(**overrides: object) -> Settings:
     values: dict[str, object] = {
         "env": "test",
+        "debug": False,
+        "log_json": False,
+        "sweeper_enabled": True,
+        "allow_sweeper_disabled": False,
         "database_url": "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/sthalo_test",
         "supabase_url": "http://127.0.0.1:54321",
         "supabase_anon_key": "test-anon-key",
