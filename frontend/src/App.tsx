@@ -3,16 +3,23 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth } from './auth/RequireAuth'
 import { AppShell } from './components/AppShell'
+import { AdminAuditPage } from './pages/AdminAuditPage'
 import { AdminListingsPage } from './pages/AdminListingsPage'
+import { AdminOverviewPage } from './pages/AdminOverviewPage'
+import { AdminReservationDetailPage } from './pages/AdminReservationDetailPage'
+import { AdminReservationsPage } from './pages/AdminReservationsPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { OwnerAvailabilityPage } from './pages/OwnerAvailabilityPage'
+import { OwnerReservationsPage } from './pages/OwnerReservationsPage'
 import { OwnerListingEditorPage } from './pages/OwnerListingEditorPage'
 import { OwnerListingsPage } from './pages/OwnerListingsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { PublicListingPage } from './pages/PublicListingPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { ReservationDetailPage } from './pages/ReservationDetailPage'
+import { ReservationsPage } from './pages/ReservationsPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { VehiclesPage } from './pages/VehiclesPage'
 import { VerifyEmailPage } from './pages/VerifyEmailPage'
@@ -51,6 +58,13 @@ function App() {
             <Route element={<RequireAuth />}>
               <Route path="account/profile" element={<ProfilePage />} />
               <Route path="account/vehicles" element={<VehiclesPage />} />
+              <Route path="account/bookings" element={<ReservationsPage />} />
+              <Route path="account/bookings/:reservationId" element={<ReservationDetailPage />} />
+              <Route path="account/reservations" element={<OwnerReservationsPage />} />
+              <Route
+                path="account/reservations/:reservationId"
+                element={<ReservationDetailPage />}
+              />
               <Route path="account/listings" element={<OwnerListingsPage />} />
               <Route path="account/listings/new" element={<OwnerListingEditorPage />} />
               <Route path="account/listings/:listingId/edit" element={<OwnerListingEditorPage />} />
@@ -58,7 +72,14 @@ function App() {
                 path="account/listings/:listingId/availability"
                 element={<OwnerAvailabilityPage />}
               />
+              <Route path="admin" element={<AdminOverviewPage />} />
               <Route path="admin/listings" element={<AdminListingsPage />} />
+              <Route path="admin/reservations" element={<AdminReservationsPage />} />
+              <Route
+                path="admin/reservations/:reservationId"
+                element={<AdminReservationDetailPage />}
+              />
+              <Route path="admin/audit" element={<AdminAuditPage />} />
             </Route>
             <Route path="*" element={<NotFoundPage />} />
           </Route>

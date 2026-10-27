@@ -11,11 +11,13 @@ from app.modules.listings.models import (
     Resource,
 )
 from app.modules.profiles.models import Vehicle
+from app.modules.reservations.models import IdempotencyKey
 
 __all__ = [
     "AuditEvent",
     "AvailabilityRule",
     "BlockedInterval",
+    "IdempotencyKey",
     "Listing",
     "ListingPhoto",
     "ParkingListing",

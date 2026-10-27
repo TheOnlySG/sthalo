@@ -2,6 +2,9 @@ import { supabase } from './supabase'
 import { API_BASE_URL } from './env'
 import type {
   AdminListing,
+  AdminOverview,
+  AdminReservationDetail,
+  AuditEvent,
   AvailabilityResponse,
   AvailabilityRule,
   AvailabilityRuleInput,
@@ -16,6 +19,10 @@ import type {
   ParkingSearchRequest,
   ParkingSearchResponse,
   PublicListing,
+  Reservation,
+  ReservationQuote,
+  ReservationStatus,
+  ReservationWindowInput,
   UserProfile,
   Vehicle,
   VehicleInput,
@@ -69,11 +76,12 @@ function isApiErrorPayload(value: unknown): value is ApiErrorPayload {
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
+  headers?: Record<string, string>
 }
 
 async function request<T>(path: string, options: RequestOptions = {}, retry = true): Promise<T> {
   const { data } = await supabase.auth.getSession()
-  const headers = new Headers({ Accept: 'application/json' })
+  const headers = new Headers({ Accept: 'application/json', ...options.headers })
   const isFormData = options.body instanceof FormData
   if (options.body !== undefined && !isFormData) {
     headers.set('Content-Type', 'application/json')
@@ -282,6 +290,54 @@ export function deleteBlockedInterval(id: string, blockId: string): Promise<void
   )
 }
 
+export function quoteReservation(values: ReservationWindowInput): Promise<ReservationQuote> {
+  return request<ReservationQuote>('/reservations/quote', { method: 'POST', body: values })
+}
+
+export function createReservation(
+  values: ReservationWindowInput,
+  idempotencyKey: string,
+): Promise<Reservation> {
+  return request<Reservation>('/reservations', {
+    method: 'POST',
+    body: values,
+    headers: { 'Idempotency-Key': idempotencyKey },
+  })
+}
+
+export function getReservation(id: string): Promise<Reservation> {
+  return request<Reservation>(`/reservations/${encodeURIComponent(id)}`)
+}
+
+export function listMyReservations(status?: ReservationStatus): Promise<Reservation[]> {
+  const suffix = status ? `?status=${encodeURIComponent(status)}` : ''
+  return request<Reservation[]>(`/reservations/me${suffix}`)
+}
+
+export function listOwnerReservations(status?: ReservationStatus): Promise<Reservation[]> {
+  const suffix = status ? `?status=${encodeURIComponent(status)}` : ''
+  return request<Reservation[]>(`/owner/reservations${suffix}`)
+}
+
+export function confirmReservation(id: string, idempotencyKey: string): Promise<Reservation> {
+  return request<Reservation>(`/reservations/${encodeURIComponent(id)}/confirm`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+  })
+}
+
+export function cancelReservation(
+  id: string,
+  reason: string | null,
+  idempotencyKey: string,
+): Promise<Reservation> {
+  return request<Reservation>(`/reservations/${encodeURIComponent(id)}/cancel`, {
+    method: 'POST',
+    body: { reason },
+    headers: { 'Idempotency-Key': idempotencyKey },
+  })
+}
+
 export function searchParking(params: ParkingSearchRequest): Promise<ParkingSearchResponse> {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
@@ -322,6 +378,49 @@ export function suspendListing(id: string, note: string): Promise<AdminListing> 
 
 export function restoreListing(id: string, note: string): Promise<AdminListing> {
   return moderateListing(id, 'restore', note)
+}
+
+export function getAdminOverview(): Promise<AdminOverview> {
+  return request<AdminOverview>('/admin/overview')
+}
+
+export function listAdminReservations(
+  status?: ReservationStatus,
+  listingId?: string,
+): Promise<Reservation[]> {
+  const query = new URLSearchParams()
+  if (status) {
+    query.set('status', status)
+  }
+  if (listingId) {
+    query.set('listing_id', listingId)
+  }
+  const serialized = query.toString()
+  const suffix = serialized ? `?${serialized}` : ''
+  return request<Reservation[]>(`/admin/reservations${suffix}`)
+}
+
+export function getAdminReservation(id: string): Promise<AdminReservationDetail> {
+  return request<AdminReservationDetail>(`/admin/reservations/${encodeURIComponent(id)}`)
+}
+
+export function listAdminAudit(params: {
+  entity_type?: string
+  entity_id?: string
+  actor_id?: string
+  from?: string
+  to?: string
+  limit?: number
+}): Promise<AuditEvent[]> {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      query.set(key, String(value))
+    }
+  }
+  const serialized = query.toString()
+  const suffix = serialized ? `?${serialized}` : ''
+  return request<AuditEvent[]>(`/admin/audit${suffix}`)
 }
 
 export function errorMessage(error: unknown): string {

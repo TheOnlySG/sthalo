@@ -15,6 +15,7 @@ import {
   formatPriceSummary,
   formatVehicleTypes,
 } from '../lib/listingFormat'
+import { AdminNav } from '../components/AdminNav'
 import { StatusBadge } from '../components/StatusBadge'
 import type { AdminListing, ListingStatus, UserProfile } from '../types'
 
@@ -145,6 +146,7 @@ export function AdminListingsPage() {
           </select>
         </label>
       </header>
+      <AdminNav />
 
       {error ? (
         <p className="alert alert-error" role="alert">

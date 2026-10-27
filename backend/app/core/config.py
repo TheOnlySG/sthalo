@@ -51,6 +51,13 @@ class Settings(BaseSettings):
     max_upload_bytes: int = Field(default=5 * 1024 * 1024, gt=0, le=50 * 1024 * 1024)
     geocode_provider: Literal["none"] = "none"
 
+    rate_limit_enabled: bool = True
+    rate_limit_window_seconds: int = Field(default=60, ge=1, le=3600)
+    rate_limit_default_requests: int = Field(default=300, ge=1, le=100_000)
+    rate_limit_read_requests: int = Field(default=600, ge=1, le=100_000)
+    rate_limit_booking_requests: int = Field(default=120, ge=1, le=100_000)
+    rate_limit_trust_proxy: bool = False
+
     @field_validator("log_level")
     @classmethod
     def normalize_log_level(cls, value: str) -> str:

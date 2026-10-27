@@ -57,6 +57,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Scan tracked files for secrets
+        run: ./scripts/check_secrets.sh
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -69,6 +72,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      - name: Audit Python dependencies
+        working-directory: backend
+        run: pip-audit --progress-spinner off
+
       - name: Lint
         working-directory: backend
         run: ruff check .
@@ -80,6 +87,10 @@ jobs:
       - name: Type check
         working-directory: backend
         run: mypy app
+
+      - name: Verify OpenAPI snapshot
+        working-directory: backend
+        run: python scripts/export_openapi.py --check
 
       - name: Unit tests
         working-directory: backend
@@ -163,7 +174,7 @@ jobs:
                   version = await conn.fetchval(
                       "SELECT version_num FROM sthalo.alembic_version"
                   )
-                  assert version == "20261026_0005", version
+                  assert version == "20261026_0006", version
                   tables = {
                       await conn.fetchval("SELECT to_regclass('sthalo.users')"),
                       await conn.fetchval("SELECT to_regclass('sthalo.vehicles')"),
@@ -175,6 +186,7 @@ jobs:
                       await conn.fetchval("SELECT to_regclass('sthalo.audit_events')"),
                       await conn.fetchval("SELECT to_regclass('sthalo.availability_rules')"),
                       await conn.fetchval("SELECT to_regclass('sthalo.blocked_intervals')"),
+                      await conn.fetchval("SELECT to_regclass('sthalo.idempotency_keys')"),
                   }
                   expected_tables = {
                       "sthalo.users",
@@ -187,6 +199,7 @@ jobs:
                       "sthalo.audit_events",
                       "sthalo.availability_rules",
                       "sthalo.blocked_intervals",
+                      "sthalo.idempotency_keys",
                   }
                   assert tables == expected_tables, tables
                   reservation_exclusion = await conn.fetchval(
@@ -245,6 +258,25 @@ jobs:
                       "ix_availability_rules_listing_weekday",
                       "ix_blocked_intervals_resource_start",
                   }, availability_indexes
+                  reservation_indexes = {
+                      row["indexname"]
+                      for row in await conn.fetch(
+                          "SELECT indexname FROM pg_indexes "
+                          "WHERE schemaname = 'sthalo' AND indexname = ANY($1::text[])",
+                          [
+                              "ix_reservations_hold_expiry",
+                              "ix_reservations_status_start",
+                              "ix_reservations_status_end",
+                              "ix_idempotency_keys_expires_at",
+                          ],
+                      )
+                  }
+                  assert reservation_indexes == {
+                      "ix_reservations_hold_expiry",
+                      "ix_reservations_status_start",
+                      "ix_reservations_status_end",
+                      "ix_idempotency_keys_expires_at",
+                  }, reservation_indexes
                   trigger = await conn.fetchval(
                       "SELECT 1 FROM pg_trigger "
                       "WHERE tgrelid = 'auth.users'::regclass "
@@ -304,6 +336,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Audit production frontend dependencies
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Lint
         working-directory: frontend

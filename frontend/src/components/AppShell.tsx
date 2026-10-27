@@ -73,11 +73,17 @@ export function AppShell() {
               <NavLink className={navClassName} to="/account/vehicles">
                 Vehicles
               </NavLink>
+              <NavLink className={navClassName} to="/account/bookings">
+                Bookings
+              </NavLink>
+              <NavLink className={navClassName} to="/account/reservations">
+                Reservations
+              </NavLink>
               <NavLink className={navClassName} to="/account/listings">
                 Listings
               </NavLink>
               {profile?.is_admin ? (
-                <NavLink className={navClassName} to="/admin/listings">
+                <NavLink className={navClassName} to="/admin">
                   Admin
                 </NavLink>
               ) : null}

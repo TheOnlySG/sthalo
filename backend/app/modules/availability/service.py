@@ -173,7 +173,6 @@ async def _busy_intervals(
         if bounds is not None:
             intervals.append(bounds)
 
-    now = datetime.now(UTC)
     reservation_rows: Any = await session.scalars(
         select(Reservation.time_range).where(
             Reservation.resource_id.in_(resource_ids),
@@ -182,7 +181,7 @@ async def _busy_intervals(
                 Reservation.status.in_(LIVE_RESERVATION_STATUSES)
                 | (
                     (Reservation.status == "pending_confirmation")
-                    & (Reservation.hold_expires_at > now)
+                    & (Reservation.hold_expires_at > func.now())
                 )
             ),
         )
@@ -282,7 +281,6 @@ async def available_listing_ids(
             if bounds is not None:
                 resource_id = type_cast(UUID, raw_resource_id)
                 busy_by_listing[resource_to_listing[resource_id]].append(bounds)
-        now = datetime.now(UTC)
         reservation_rows = await session.execute(
             select(Reservation.resource_id, Reservation.time_range).where(
                 Reservation.resource_id.in_(all_resources),
@@ -291,7 +289,7 @@ async def available_listing_ids(
                     Reservation.status.in_(LIVE_RESERVATION_STATUSES)
                     | (
                         (Reservation.status == "pending_confirmation")
-                        & (Reservation.hold_expires_at > now)
+                        & (Reservation.hold_expires_at > func.now())
                     )
                 ),
             )
@@ -420,7 +418,6 @@ async def _live_reservation_conflicts(
     start: datetime,
     end: datetime,
 ) -> list[str]:
-    now = datetime.now(UTC)
     requested = func.tstzrange(start, end, "[)")
     return list(
         await session.scalars(
@@ -431,7 +428,7 @@ async def _live_reservation_conflicts(
                     Reservation.status.in_(LIVE_RESERVATION_STATUSES)
                     | (
                         (Reservation.status == "pending_confirmation")
-                        & (Reservation.hold_expires_at > now)
+                        & (Reservation.hold_expires_at > func.now())
                     )
                 ),
             )
@@ -549,3 +546,33 @@ async def delete_block(
         before=before,
     )
     await session.commit()
+
+
+async def is_listing_window_available(
+    session: AsyncSession,
+    listing: Listing,
+    start: datetime,
+    end: datetime,
+) -> bool:
+    """Return whether a listing's rules fully cover a requested window.
+
+    Existing reservations and blocks are treated as busy. The caller should
+    hold the resource row lock before using this check for a write.
+    """
+    rules = list(
+        await session.scalars(
+            select(AvailabilityRule)
+            .where(AvailabilityRule.listing_id == listing.id)
+            .order_by(AvailabilityRule.weekday, AvailabilityRule.start_time)
+        )
+    )
+    resources = await _listing_resources(session, listing.id)
+    busy = await _busy_intervals(session, resources, start, end)
+    windows = _free_intervals(
+        rules=rules,
+        timezone=listing.timezone,
+        busy=busy,
+        start=start,
+        end=end,
+    )
+    return any(window_start <= start and end <= window_end for window_start, window_end in windows)

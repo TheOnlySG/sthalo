@@ -29,8 +29,7 @@ claims.
   ([run 40348810807](https://github.com/TheOnlySG/sthalo/actions/runs/40348810807)).
 - V2 owner listings are implemented locally: draft/edit/submit, private
   validated photos, moderation, lifecycle actions, public listing detail, and
-  the local admin queue. The reservation schema needed by archive safety checks
-  is in migration `20261026_0003`; booking APIs remain deferred.
+  the local admin queue.
 - V3 discovery is implemented locally: active-only radius and bounding-box
   search, vehicle/covered/price filters, distance/price sorting, keyset cursor
   pagination, privacy-safe approximate coordinates and distances, and an
@@ -40,16 +39,41 @@ claims.
 - V4 availability is implemented locally: owner weekly rules, one-off blocked
   intervals with overlap protection, deterministic 15-minute availability
   windows in the listing timezone, block-vs-booking conflict checks, a public
-  advisory availability API, availability-aware search windows, and an owner
-  availability editor. Migration `20261026_0005` adds the new tables and
-  exclusion constraint.
-- Availability-aware search (`P1-V3-03`) is now covered by the V4 window
-  filter. Reverse geocoding (`P1-V3-05`) is intentionally unused; the pin
-  remains manual. Reservation creation APIs remain deferred to V5.
+  availability API, availability-aware search windows, and an owner availability
+  editor. Migration `20261026_0005` adds the new tables and an exclusion
+  constraint.
+- V5 reservations are implemented locally: authoritative 15-minute quotes,
+  pricing snapshots, idempotent create/confirm/cancel, 10-minute holds,
+  privacy-aware exact-detail reveal, lazy expiry reconciliation, an
+  advisory-locked lifecycle sweeper, owner cancellation, and vehicle deletion
+  safety. Migration `20261026_0006` adds `sthalo.idempotency_keys` and the
+  lifecycle sweep index.
+- `G-V5` passed locally: the 20-way booking race, same-key concurrency,
+  block-vs-booking race, privacy, expiry/sweeper, and cancellation tests passed
+  three consecutive runs.
+- V6 customer and owner journeys are implemented locally: quote/hold/confirm/
+  cancel UI, hold countdown, customer booking list/detail, owner reservation
+  dashboard, exact address/access reveal only after confirmation, empty/loading/
+  error states, and a visible no-payment demo banner.
+- V7 admin operations are implemented locally: overview counts, read-only
+  reservation inspection with audit timeline, audit filtering, moderation, and
+  an audited `scripts/make_admin.py` bootstrap path. Non-admin admin requests
+  return `403`.
+- V8 local hardening is implemented: API security headers, explicit CORS,
+  per-client rate limits with `429` envelopes, frontend CSP/security headers,
+  secret scanning, dependency audits, OpenAPI snapshot drift checks, admin
+  bootstrap, and a tested backup/restore drill. See
+  [`docs/security-review.md`](docs/security-review.md).
+- Final local checks currently pass: backend `ruff`, format, `mypy`, 117 tests;
+  frontend format, lint, typecheck, 14 tests, and production build; and the
+  Playwright browser E2E suite (2 tests) covering the customer/owner/admin
+  journey, critical axe checks, and a 360 px keyboard/mobile pass.
+- Availability-aware search (`P1-V3-03`) is covered. Reverse geocoding
+  (`P1-V3-05`) is intentionally unused; the pin remains manual.
 - Hosted `G-V1` remains unverified because no hosted provider resources exist.
-  V2, V3, and V4 proceed as local-only slices under that documented exception.
+  V2–V8 proceed as local-only slices under that documented exception.
 - Hosted deployment: not started. No Render, Supabase, or Cloudflare Pages
-  project has been created.
+  project has been created; V9 remains a hard gate.
 - Payments, EV charging, reviews, disputes, and payouts: deferred.
 
 ## Repository layout
@@ -58,6 +82,7 @@ claims.
 backend/    FastAPI + async SQLAlchemy + Alembic API
 frontend/   React + Vite + TypeScript application
 supabase/   Local Supabase configuration (Mailpit, Auth, Storage)
+scripts/    Repository-level secret scan
 .github/    CI workflow
 ```
 
@@ -73,12 +98,12 @@ npx --yes supabase@2.122.0 status
 
 Local endpoints:
 
-| Service | URL |
-|---|---|
-| API / Auth | `http://127.0.0.1:54321` |
-| Database | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
-| Studio | `http://127.0.0.1:54323` |
-| Mailpit | `http://127.0.0.1:54324` |
+| Service    | URL                                                       |
+| ---------- | --------------------------------------------------------- |
+| API / Auth | `http://127.0.0.1:54321`                                  |
+| Database   | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
+| Studio     | `http://127.0.0.1:54323`                                  |
+| Mailpit    | `http://127.0.0.1:54324`                                  |
 
 Local email confirmation is enabled. Signup and password-reset messages are
 captured by Mailpit at `http://127.0.0.1:54324`.
@@ -112,7 +137,9 @@ events, and the reservation schema used by archive safety checks. Migration
 `20261026_0004` adds discovery indexes for active public locations, supported
 vehicle types, and effective price. Migration `20261026_0005` adds owner
 availability rules, blocked intervals, and the block-overlap exclusion
-constraint. Do not use `supabase db reset` as the application migration source.
+constraint. Migration `20261026_0006` adds reservation idempotency keys and the
+lifecycle sweep index. Do not use `supabase db reset` as the application
+migration source.
 
 ## Quick start
 
@@ -158,6 +185,27 @@ npm run build
 npm run format:check
 ```
 
+Operational checks:
+
+```bash
+# Backend OpenAPI snapshot
+cd backend && .venv/bin/python scripts/export_openapi.py --check
+
+# Audits and tracked-secret scan
+cd backend && .venv/bin/pip-audit --progress-spinner off
+cd frontend && npm audit --omit=dev --audit-level=high
+./scripts/check_secrets.sh
+
+# Backup/restore drill (local Supabase)
+set -a; source backend/.env; set +a
+backend/scripts/backup_restore_check.sh
+```
+
+API responses carry `X-Request-ID`, defensive browser headers, and rate-limit
+headers. Rate limits return the standard `429 RATE_LIMITED` error envelope with
+`Retry-After`. The limits are configured in `backend/.env` and are per process
+for the zero-cost single-instance demo.
+
 ### Local auth walkthrough
 
 1. Open `/register`, enter a demo name, demo email, and a password of at least
@@ -168,28 +216,38 @@ npm run format:check
 4. Edit the profile, accept owner terms, and add/edit/remove up to ten vehicles.
 5. Open `/account/listings`, create a parking draft, add pricing and 1–8 photos,
    then submit it for review. Public detail appears only after approval.
-6. To review locally, promote a test account in Studio SQL:
-   `UPDATE sthalo.users SET is_admin = true WHERE email = '<your-email>';`
-   Then open `/admin/listings`, approve/reject/suspend/restore, and refresh the
-   owner dashboard to see the result.
+6. To review locally, promote a test account with the audited script:
+   `backend/.venv/bin/python backend/scripts/make_admin.py --email '<your-email>'`.
+   Use `--revoke` to remove access. Open `/admin/listings`, approve/reject/
+   suspend/restore, and refresh the owner dashboard to see the result.
 7. Open `/search` to see approved listings on the OpenStreetMap view. Try a
    radius search, filters, sorting, marker/list selection, and “Search this map
    area” for a bounding-box search. Distances and pins are approximate.
 8. From `/account/listings`, open **Availability** to add weekly windows and
-   one-off IST blocks. Public availability is advisory until booking APIs land.
-9. Sign out from the header. Password reset also uses Mailpit and lands on
-   `/reset-password`, where the new password is set.
+   one-off IST blocks.
+9. Add a customer vehicle, open an approved listing, request a quote, and place
+   a 10-minute hold. Confirm it from `/account/bookings/:id`; the exact address
+   and access details appear only after confirmation.
+10. Open `/account/reservations` as the owner to see live bookings, and cancel
+    with a reason to release the slot.
+11. As admin, inspect `/admin`, `/admin/reservations/:id`, and `/admin/audit`.
+    Every listing/reservation mutation has a note and audit event.
+12. Sign out from the header. Password reset also uses Mailpit and lands on
+    `/reset-password`, where the new password is set.
 
 The backend verifies Supabase access tokens against the local JWKS. Keep the
 frontend `VITE_API_BASE_URL` origin in backend `CORS_ORIGINS`. The frontend never
 stores or submits passwords to FastAPI; Supabase Auth owns credentials.
 
-The CI workflow runs backend lint, format, type checks, unit tests, migrations
+The CI workflow runs a tracked-file secret scan, Python/npm dependency audits,
+backend lint, format, type checks, OpenAPI snapshot drift, unit tests, migrations
 up/down/up, integration tests, and the PostGIS/`btree_gist` probe, plus frontend
-lint, typecheck, tests, build, and formatting. V0 and V1 CI are green. V2–V4
-local checks cover listing/photos/moderation, public detail, lifecycle, search
-filters/pagination/privacy, the map search page, availability rules/blocks,
-timezone/window computation, and block-vs-booking conflicts.
+lint, typecheck, tests, build, and formatting. V0 and V1 CI are green. V2–V8
+local checks cover listings/photos/moderation, public detail, search filters/
+privacy, availability, reservation concurrency/idempotency/lifecycle/privacy,
+owner/customer UI, admin inspection, security headers/rate limits, and backup/
+restore. The committed Playwright/axe suite runs locally against Chrome and the
+local Supabase stack; it is not part of CI. See `docs/security-review.md`.
 
 ## Hosted demo policy
 

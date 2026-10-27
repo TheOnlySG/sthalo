@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, ErrorCode
 from app.modules.identity.models import User
+from app.modules.listings.models import Reservation
 from app.modules.profiles.models import Vehicle
 from app.modules.profiles.schemas import VehicleCreate
 
@@ -107,6 +108,21 @@ async def delete_vehicle(
     vehicle_id: UUID,
 ) -> None:
     vehicle = await get_owned_vehicle(session, user, vehicle_id)
+    future_count = await session.scalar(
+        select(func.count())
+        .select_from(Reservation)
+        .where(
+            Reservation.vehicle_id == vehicle.id,
+            Reservation.status.in_(("pending_confirmation", "confirmed", "active")),
+            func.upper(Reservation.time_range) > func.now(),
+        )
+    )
+    if future_count:
+        raise AppError(
+            ErrorCode.HAS_FUTURE_BOOKINGS,
+            "This vehicle is attached to an active or upcoming reservation.",
+            status_code=409,
+        )
     await session.delete(vehicle)
     await session.commit()
     _logger.info(

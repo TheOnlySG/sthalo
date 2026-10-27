@@ -271,3 +271,136 @@ export interface AvailabilityResponse {
   to: string
   windows: AvailabilityWindow[]
 }
+
+export type ReservationStatus =
+  'pending_confirmation' | 'confirmed' | 'active' | 'completed' | 'cancelled' | 'expired'
+
+export type ReservationViewerRole = 'customer' | 'owner' | 'admin'
+
+export interface ReservationListing {
+  id: string
+  title: string
+  locality: string
+  city: string
+  latitude: number
+  longitude: number
+}
+
+export interface ReservationVehicle {
+  id: string
+  vehicle_type: VehicleType
+  registration_no: string | null
+  length_mm: number | null
+  width_mm: number | null
+  height_mm: number | null
+  is_ev: boolean
+}
+
+export interface PriceBreakdown {
+  pricing_model: PricingModel
+  duration_minutes: number
+  billable_minutes: number
+  chargeable_days: number
+  hourly_rate_paise: number | null
+  daily_cap_paise: number | null
+  hourly_component_paise: number
+  cap_component_paise: number
+  total_paise: number
+  calculation: string
+}
+
+export interface ReservationQuote {
+  listing_id: string
+  start: string
+  end: string
+  currency: 'INR'
+  base_amount_paise: number
+  total_paise: number
+  price: PriceBreakdown
+}
+
+export interface Reservation {
+  id: string
+  reference: string
+  status: ReservationStatus
+  viewer_role: ReservationViewerRole
+  listing: ReservationListing
+  vehicle: ReservationVehicle
+  customer_name: string | null
+  owner_name: string
+  start: string
+  end: string
+  hold_expires_at: string | null
+  currency: 'INR'
+  base_amount_paise: number
+  total_paise: number
+  price_snapshot: Record<string, unknown>
+  can_confirm: boolean
+  can_cancel: boolean
+  exact_address: string | null
+  pincode: string | null
+  exact_latitude: number | null
+  exact_longitude: number | null
+  access_instructions: string | null
+  cancel_reason: string | null
+  confirmed_at: string | null
+  started_at: string | null
+  completed_at: string | null
+  cancelled_at: string | null
+  expired_at: string | null
+  created_at: string
+}
+
+export interface ReservationWindowInput {
+  listing_id: string
+  vehicle_id: string
+  start: string
+  end: string
+}
+
+export const RESERVATION_STATUS_LABELS: Record<ReservationStatus, string> = {
+  pending_confirmation: 'Awaiting confirmation',
+  confirmed: 'Confirmed',
+  active: 'In progress',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  expired: 'Expired',
+}
+
+export const RESERVATION_STATUS_OPTIONS: ReadonlyArray<{
+  value: ReservationStatus
+  label: string
+}> = [
+  { value: 'pending_confirmation', label: 'Awaiting confirmation' },
+  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'active', label: 'In progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'expired', label: 'Expired' },
+]
+
+export interface AdminOverview {
+  pending_listings: number
+  live_reservations: number
+  expiring_holds: number
+}
+
+export interface AuditEvent {
+  id: string
+  actor_id: string | null
+  actor_type: 'user' | 'admin' | 'system'
+  actor_name: string | null
+  actor_email: string | null
+  action: string
+  entity_type: string
+  entity_id: string | null
+  before: Record<string, unknown> | null
+  after: Record<string, unknown> | null
+  request_id: string | null
+  created_at: string
+}
+
+export interface AdminReservationDetail {
+  reservation: Reservation
+  audit: AuditEvent[]
+}

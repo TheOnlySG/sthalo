@@ -13,9 +13,9 @@ from typing import cast as type_cast
 from uuid import UUID
 
 from geoalchemy2 import Geography, Geometry
-from sqlalchemy import and_, cast, func, or_, select
+from sqlalchemy import and_, cast, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager, lazyload, selectinload
+from sqlalchemy.orm import lazyload, selectinload
 
 from app.core.errors import AppError, ErrorCode
 from app.integrations.storage.supabase import PhotoStorage, PhotoStorageError
@@ -31,6 +31,8 @@ from app.modules.listings.models import Listing, ListingStatus, ParkingListing
 from app.modules.listings.schemas import ParkingPublicRead
 
 CURSOR_VERSION = 1
+
+SearchRow = tuple[UUID, float, int, float, float]
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,26 +56,38 @@ async def search_parking_listings(
         Geography,
     )
     distance = func.ST_Distance(Listing.public_location, center)
-    price = func.coalesce(
+    parking_price = func.coalesce(
         ParkingListing.price_hourly_paise,
         ParkingListing.price_daily_cap_paise,
     )
 
+    parking_attrs_query = select(parking_price.label("effective_price_paise")).where(
+        ParkingListing.listing_id == Listing.id
+    )
+    if params.vehicle_type is not None:
+        parking_attrs_query = parking_attrs_query.where(
+            ParkingListing.supported_vehicle_types.contains([params.vehicle_type.value])
+        )
+    if params.max_price_paise is not None:
+        parking_attrs_query = parking_attrs_query.where(parking_price <= params.max_price_paise)
+    if params.covered is not None:
+        parking_attrs_query = parking_attrs_query.where(
+            ParkingListing.is_covered.is_(params.covered)
+        )
+    parking_attrs = parking_attrs_query.limit(1).lateral("parking_attrs")
+    price = parking_attrs.c.effective_price_paise
+
     statement = (
         select(
-            Listing,
+            Listing.id,
             distance.label("distance_m"),
             price.label("effective_price_paise"),
             func.ST_Y(cast(Listing.public_location, Geometry)).label("public_latitude"),
             func.ST_X(cast(Listing.public_location, Geometry)).label("public_longitude"),
         )
-        .join(ParkingListing, ParkingListing.listing_id == Listing.id)
+        .select_from(Listing)
+        .join(parking_attrs, true())
         .where(Listing.status == ListingStatus.ACTIVE)
-        .options(
-            contains_eager(Listing.parking),
-            selectinload(Listing.photos),
-            lazyload(Listing.owner),
-        )
     )
 
     if params.bbox_bounds is not None:
@@ -92,15 +106,6 @@ async def search_parking_listings(
                 params.effective_radius_m,
             )
         )
-
-    if params.vehicle_type is not None:
-        statement = statement.where(
-            ParkingListing.supported_vehicle_types.contains([params.vehicle_type.value])
-        )
-    if params.max_price_paise is not None:
-        statement = statement.where(price <= params.max_price_paise)
-    if params.covered is not None:
-        statement = statement.where(ParkingListing.is_covered.is_(params.covered))
 
     availability_window = params.availability_window
     if params.cursor is not None and availability_window is None:
@@ -127,10 +132,10 @@ async def search_parking_listings(
 
     if availability_window is None:
         statement = statement.limit(params.limit + 1)
-    raw_rows = list(await session.execute(statement.execution_options(populate_existing=True)))
-    rows: list[tuple[Listing, float, int, float, float]] = [
+    raw_rows = list(await session.execute(statement))
+    rows: list[SearchRow] = [
         (
-            type_cast(Listing, row[0]),
+            type_cast(UUID, row[0]),
             type_cast(float, row[1]),
             type_cast(int, row[2]),
             type_cast(float, row[3]),
@@ -144,26 +149,40 @@ async def search_parking_listings(
             rows = [row for row in rows if _after_cursor(row, params.sort, cursor)]
         available = await available_listing_ids(
             session,
-            [row[0].id for row in rows],
+            [row[0] for row in rows],
             *availability_window,
         )
-        rows = [row for row in rows if row[0].id in available]
+        rows = [row for row in rows if row[0] in available]
     page = rows[: params.limit]
     next_cursor = None
     if len(rows) > params.limit and page:
-        last_listing, last_distance, last_price, _, _ = page[-1]
+        last_listing_id, last_distance, last_price, _, _ = page[-1]
         last_value: float | int = (
             float(last_distance) if params.sort == SearchSort.DISTANCE else int(last_price)
         )
-        next_cursor = _encode_cursor(params.sort, last_value, last_listing.id)
+        next_cursor = _encode_cursor(params.sort, last_value, last_listing_id)
 
-    cover_urls = await asyncio.gather(
-        *[_cover_url(listing, storage) for listing, _, _, _, _ in page]
-    )
+    page_ids = [row[0] for row in page]
+    listings_by_id: dict[UUID, Listing] = {}
+    if page_ids:
+        listing_result = await session.execute(
+            select(Listing)
+            .where(Listing.id.in_(page_ids))
+            .options(
+                selectinload(Listing.parking),
+                selectinload(Listing.photos),
+                lazyload(Listing.owner),
+            )
+        )
+        listings_by_id = {listing.id: listing for listing in listing_result.scalars()}
+    page_listings = [listings_by_id[row[0]] for row in page]
+
+    cover_urls = await asyncio.gather(*[_cover_url(listing, storage) for listing in page_listings])
     items = [
         _search_item(listing, float(distance_m), public_lat, public_lng, cover_url)
-        for (listing, distance_m, _, public_lat, public_lng), cover_url in zip(
+        for (_, distance_m, _, public_lat, public_lng), listing, cover_url in zip(
             page,
+            page_listings,
             cover_urls,
             strict=True,
         )
@@ -181,12 +200,12 @@ async def search_parking_listings(
 
 
 def _after_cursor(
-    row: tuple[Listing, float, int, float, float],
+    row: SearchRow,
     sort: SearchSort,
     cursor: SearchCursor,
 ) -> bool:
     value: float | int = float(row[1]) if sort == SearchSort.DISTANCE else int(row[2])
-    return value > cursor.value or (value == cursor.value and row[0].id > cursor.listing_id)
+    return value > cursor.value or (value == cursor.value and row[0] > cursor.listing_id)
 
 
 def _search_item(

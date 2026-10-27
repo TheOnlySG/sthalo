@@ -32,3 +32,6 @@ supabase/.env
 # Editors
 .idea/
 .vscode/
+
+# Local Playwright state
+frontend/e2e/.state.json

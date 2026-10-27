@@ -2,12 +2,13 @@
 
 FastAPI + async SQLAlchemy backend for the Sthalo Phase 1 parking MVP.
 
-The repository is being built in vertical slices. This checkpoint contains the
+The repository is built in vertical slices. This checkpoint contains the
 application foundation, V1 identity/profile/owner-terms/vehicle APIs, V2 owner
-listings with private photos and admin moderation, and V3 public discovery
-search. Supabase Auth owns credentials; FastAPI verifies access tokens through
-JWKS and never handles passwords. Availability and booking APIs arrive in later
-slices.
+listings with private photos and admin moderation, V3 public discovery, V4
+availability rules and blocks, V5 reservations, V6 customer/owner journeys, V7
+read-only admin operations, and local V8 hardening. Supabase Auth owns
+credentials; FastAPI verifies access tokens through JWKS and never handles
+passwords.
 
 ## Configuration
 
@@ -26,8 +27,9 @@ Required configuration includes `DATABASE_URL`, `SUPABASE_URL`,
 `SUPABASE_JWT_ISSUER`, `SUPABASE_JWT_AUDIENCE`, and `CORS_ORIGINS`. Optional
 controls include
 `DEBUG`, `LOG_LEVEL`, `LOG_JSON`, `SWEEPER_ENABLED`,
-`ALLOW_SWEEPER_DISABLED`, `SWEEPER_INTERVAL_SECONDS`, `MAX_UPLOAD_BYTES`, and
-`GEOCODE_PROVIDER`.
+`ALLOW_SWEEPER_DISABLED`, `SWEEPER_INTERVAL_SECONDS`, `MAX_UPLOAD_BYTES`,
+`GEOCODE_PROVIDER`, and the `RATE_LIMIT_*` controls. Rate limits are enabled by
+default and are per process for the zero-cost single-instance demo.
 
 Staging/production startup rejects debug mode, non-HTTPS Supabase/CORS URLs,
 local CORS hosts, placeholder or short Supabase keys, and a disabled sweeper
@@ -89,6 +91,16 @@ token except where noted:
   listings only; also supports `vehicle_type`, `covered`, `max_price_paise`,
   `sort=distance|price`, `limit`, `cursor`, and an optional `start`/`end`
   availability window)
+- `POST /reservations/quote`
+- `POST /reservations` (requires `Idempotency-Key`)
+- `GET /reservations/me`, `GET /reservations/{reservation_id}`
+- `POST /reservations/{reservation_id}/confirm` (requires `Idempotency-Key`)
+- `POST /reservations/{reservation_id}/cancel` (requires `Idempotency-Key`)
+- `GET /owner/reservations`
+- `GET /admin/overview`
+- `GET /admin/reservations?status=&listing_id=`
+- `GET /admin/reservations/{reservation_id}`
+- `GET /admin/audit?entity_type=&entity_id=&actor_id=&from=&to=&limit=`
 - `GET /admin/listings`, `GET /admin/listings/{listing_id}`
 - `POST /admin/listings/{listing_id}/approve|reject|suspend|restore`
 
@@ -98,7 +110,20 @@ return straight-line distance in meters from the search center. Radius must be
 100–10,000 m; bounding boxes are capped at 0.5 degrees per side and 0.25 square
 degrees. Admin routes require `sthalo.users.is_admin = true`; a Supabase token
 role is never trusted for admin access. The `/health/live` and `/health/ready`
-endpoints are unauthenticated. Interactive docs are at `/docs`.
+endpoints are unauthenticated. Interactive docs are local/test only; production
+startup disables `/docs` and `/openapi.json`.
+
+Reservation quotes round billable time up to 15 minutes, snapshot the pricing
+model/breakdown in `price_snapshot`, and hold slots for 10 minutes. Exact
+address/access details are returned to the customer only after confirmation;
+owner and admin responses retain them. Create/confirm/cancel require a
+1–128-character `Idempotency-Key`; replay returns the stored response, while key
+reuse with a different payload returns `409 IDEMPOTENCY_KEY_REUSED`.
+
+All API responses carry `X-Request-ID`, defensive browser headers, and
+rate-limit headers on limited routes. Over-limit requests return
+`429 RATE_LIMITED` with `Retry-After` and `X-RateLimit-*`. The in-process sliding
+window is intentionally simple; a multi-worker deployment needs a shared store.
 
 ## Database migrations
 
@@ -124,7 +149,9 @@ position swaps. Migration `20261026_0004` adds a partial GiST index for active
 public locations, a GIN index for supported vehicle types, and an expression
 index for effective price. Migration `20261026_0005` adds weekly availability
 rules and blocked intervals, including a GiST exclusion constraint that prevents
-overlapping blocks on a resource. A Supabase auth-user insert provisions the
+overlapping blocks on a resource. Migration `20261026_0006` adds reservation
+idempotency keys with a 24-hour TTL and the lifecycle sweep index. A Supabase
+auth-user insert provisions the
 local profile; deleting the auth user cascades to profile-owned data. Integration
 tests expect a mock `auth.users` table in the test database.
 
@@ -135,7 +162,23 @@ ruff check .
 ruff format --check .
 mypy app
 pytest
+pip-audit --progress-spinner off
+python scripts/export_openapi.py --check
+
+# Backup/restore drill (from repository root; needs local Supabase running)
+set -a; source backend/.env; set +a
+backend/scripts/backup_restore_check.sh
 ```
+
+Admin bootstrap (audited, server-side):
+
+```bash
+python scripts/make_admin.py --email owner@example.com
+python scripts/make_admin.py --email owner@example.com --revoke
+```
+
+The script resolves `backend/.env`, updates `sthalo.users.is_admin`, and writes a
+`system` audit event. It never trusts Auth metadata or frontend claims.
 
 The API returns JSON errors shaped as:
 
@@ -151,7 +194,9 @@ The API returns JSON errors shaped as:
 ```
 
 Every response carries `X-Request-ID`; a caller-supplied value is reused only if
-it is 1–128 characters of letters, digits, `.`, `_`, or `-`.
+it is 1–128 characters of letters, digits, `.`, `_`, or `-`. Error responses use
+a stable code such as `RATE_LIMITED`, `SLOT_UNAVAILABLE`, `HOLD_EXPIRED`, or
+`IDEMPOTENCY_KEY_REUSED` and never include stack traces.
 
 ## Docker
 

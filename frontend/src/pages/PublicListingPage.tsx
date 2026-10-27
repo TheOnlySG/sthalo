@@ -8,6 +8,7 @@ import {
   formatVehicleTypes,
 } from '../lib/listingFormat'
 import { ListingPhotoGallery } from '../components/ListingPhotoGallery'
+import { ReservationBookingPanel } from '../components/ReservationBookingPanel'
 import type { PublicListing } from '../types'
 
 export function PublicListingPage() {
@@ -123,7 +124,7 @@ export function PublicListingPage() {
           <h2>Location and rules</h2>
           <p className="muted">
             The map point is approximate. The exact address and access instructions are shared only
-            after a reservation flow is added.
+            after the customer confirms a reservation.
           </p>
           <p>
             Approximate point: {listing.latitude.toFixed(4)}, {listing.longitude.toFixed(4)}
@@ -143,10 +144,12 @@ export function PublicListingPage() {
           <h3>Restrictions</h3>
           <p>{parking.restrictions || 'No extra restrictions listed.'}</p>
           <p className="alert alert-success" role="status">
-            This is a Phase 1 demo. Payments and reservations are not enabled yet.
+            This is a Phase 1 demo. Reservations are free and no payment is collected.
           </p>
         </section>
       </div>
+
+      <ReservationBookingPanel listing={listing} />
     </section>
   )
 }

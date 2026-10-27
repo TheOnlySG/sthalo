@@ -1240,3 +1240,299 @@ textarea:focus {
     flex-direction: column;
   }
 }
+
+.booking-panel {
+  border-color: #cfdcc9;
+  background: linear-gradient(145deg, #fbfcf7, #f2f6ea);
+}
+
+.booking-form {
+  margin-top: 0.4rem;
+}
+
+.booking-time-note {
+  margin: -0.35rem 0 0;
+  font-size: 0.78rem;
+}
+
+.booking-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.booking-empty p {
+  margin: 0;
+}
+
+.quote-box {
+  display: grid;
+  justify-items: start;
+  gap: 0.55rem;
+  margin-top: 0.4rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #cfdcc9;
+  border-radius: 0.8rem;
+  background: #fff;
+}
+
+.quote-box p {
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.quote-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+}
+
+.quote-heading strong {
+  font-size: 1.25rem;
+}
+
+.reservation-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.reservation-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.reservation-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.reservation-card-heading h2 {
+  margin-bottom: 0.15rem;
+}
+
+.reservation-card-heading p {
+  margin: 0;
+}
+
+.reservation-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.5rem;
+  margin: 0;
+}
+
+.reservation-card-meta div {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.reservation-card-meta dt {
+  color: var(--gray-600);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.reservation-card-meta dd {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.reservation-filter {
+  max-width: 260px;
+}
+
+.owner-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.metric-card {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--ivory-100);
+  border-radius: 0.85rem;
+  background: #fff;
+}
+
+.metric-card span {
+  color: var(--gray-600);
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.metric-card strong {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.metric-card small {
+  color: var(--gray-600);
+}
+
+.metric-warning {
+  border-color: #f0dca4;
+  background: #fffaf0;
+}
+
+.reservation-heading-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.hold-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-color: #cfdcc9;
+  background: #f4f9ea;
+}
+
+.hold-panel h2 {
+  margin-bottom: 0.2rem;
+  font-size: 2rem;
+}
+
+.hold-panel p {
+  margin-bottom: 0;
+}
+
+.reservation-disclaimer {
+  margin-bottom: 0;
+  font-size: 0.82rem;
+}
+
+.cancel-form {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+}
+
+@media (max-width: 760px) {
+  .owner-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .reservation-card-heading,
+  .quote-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .reservation-filter {
+    max-width: none;
+  }
+}
+
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.35rem;
+  border: 1px solid var(--ivory-100);
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.admin-tab {
+  padding: 0.5rem 0.8rem;
+  border-radius: 0.55rem;
+  color: var(--forest-700);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.admin-tab:hover,
+.admin-tab-active {
+  background: var(--forest-900);
+  color: var(--ivory-50);
+}
+
+.admin-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.audit-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.audit-filters .form-actions {
+  grid-column: 1 / -1;
+}
+
+.audit-event-list,
+.audit-timeline {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.audit-event-card {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.audit-timeline > li {
+  padding: 0 0 0.8rem 0.9rem;
+  border-left: 2px solid var(--ivory-100);
+}
+
+.audit-timeline-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.audit-timeline-heading p {
+  margin: 0.2rem 0;
+  font-size: 0.8rem;
+}
+
+.audit-timeline > li > p {
+  margin: 0.25rem 0;
+  font-size: 0.82rem;
+}
+
+.audit-json {
+  max-height: 14rem;
+  margin: 0.35rem 0 0;
+  padding: 0.65rem 0.75rem;
+  overflow: auto;
+  border-radius: 0.55rem;
+  background: var(--forest-950);
+  color: var(--lime-300);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 760px) {
+  .audit-filters {
+    grid-template-columns: 1fr;
+  }
+}
