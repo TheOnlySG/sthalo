@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: sthalo-demo-api
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: main
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /health/live
+    envVars:
+      - key: ENV
+        value: staging
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: LOG_JSON
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWKS_URL
+        sync: false
+      - key: SUPABASE_JWT_ISSUER
+        sync: false
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SWEEPER_ENABLED
+        value: "true"
+      - key: ALLOW_SWEEPER_DISABLED
+        value: "false"
+      - key: SWEEPER_INTERVAL_SECONDS
+        value: "45"
+      - key: MAX_UPLOAD_BYTES
+        value: "5242880"
+      - key: GEOCODE_PROVIDER
+        value: none
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: RATE_LIMIT_TRUST_PROXY
+        value: "true"

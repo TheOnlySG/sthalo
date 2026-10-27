@@ -64,16 +64,22 @@ claims.
   secret scanning, dependency audits, OpenAPI snapshot drift checks, admin
   bootstrap, and a tested backup/restore drill. See
   [`docs/security-review.md`](docs/security-review.md).
-- Final local checks currently pass: backend `ruff`, format, `mypy`, 117 tests;
-  frontend format, lint, typecheck, 14 tests, and production build; and the
-  Playwright browser E2E suite (2 tests) covering the customer/owner/admin
-  journey, critical axe checks, and a 360 px keyboard/mobile pass.
+- Final local checks pass: backend `ruff`, format, `mypy`, 117 tests; frontend
+  format, lint, typecheck, 14 tests, and production build; and the Playwright
+  browser E2E suite (2 tests) covering the customer/owner/admin journey,
+  critical axe checks, and a 360 px keyboard/mobile pass.
+- V5–V8 are committed and pushed as `ed63424`. Remote CI is green:
+  ([run 40495402592](https://github.com/TheOnlySG/sthalo/actions/runs/40495402592)).
+- `backend/scripts/seed_demo.py` provisions idempotent, clearly labeled demo
+  accounts, three Nashik listings, a customer vehicle, and one confirmed
+  booking. It also supports `--cleanup`.
 - Availability-aware search (`P1-V3-03`) is covered. Reverse geocoding
   (`P1-V3-05`) is intentionally unused; the pin remains manual.
 - Hosted `G-V1` remains unverified because no hosted provider resources exist.
   V2–V8 proceed as local-only slices under that documented exception.
 - Hosted deployment: not started. No Render, Supabase, or Cloudflare Pages
-  project has been created; V9 remains a hard gate.
+  project has been created; V9 remains a hard gate and `render.yaml` is an
+  unapplied blueprint.
 - Payments, EV charging, reviews, disputes, and payouts: deferred.
 
 ## Repository layout
@@ -158,7 +164,22 @@ uvicorn app.main:app --reload --port 8000
 `scripts/setup_local_storage.py` creates the private `listing-photos` bucket.
 It is idempotent. Health checks: `GET /health/live` and `GET /health/ready` on
 `http://127.0.0.1:8000`. Readiness requires the current Alembic head. API docs are
-at `http://127.0.0.1:8000/docs`. Backend checks:
+at `http://127.0.0.1:8000/docs`.
+
+With the API running, seed the labeled demo accounts and data from the repository
+root. Supply a demo-only password through the environment so it is never
+committed:
+
+```bash
+STHALO_DEMO_PASSWORD='<demo-only-password>' \
+backend/.venv/bin/python backend/scripts/seed_demo.py
+```
+
+Use `--cleanup` to remove the demo users, rows, and photos. Hosted runs also
+require `--confirm-demo-project` and a `backend/.env` pointed at the dedicated
+demo project. See `docs/demo-script.md` for the walkthrough.
+
+Backend checks:
 
 ```bash
 ruff check .
@@ -242,12 +263,13 @@ stores or submits passwords to FastAPI; Supabase Auth owns credentials.
 The CI workflow runs a tracked-file secret scan, Python/npm dependency audits,
 backend lint, format, type checks, OpenAPI snapshot drift, unit tests, migrations
 up/down/up, integration tests, and the PostGIS/`btree_gist` probe, plus frontend
-lint, typecheck, tests, build, and formatting. V0 and V1 CI are green. V2–V8
-local checks cover listings/photos/moderation, public detail, search filters/
-privacy, availability, reservation concurrency/idempotency/lifecycle/privacy,
-owner/customer UI, admin inspection, security headers/rate limits, and backup/
-restore. The committed Playwright/axe suite runs locally against Chrome and the
-local Supabase stack; it is not part of CI. See `docs/security-review.md`.
+lint, typecheck, tests, build, and formatting. CI is green through `ed63424`.
+V2–V8 local checks cover listings/photos/moderation, public detail, search
+filters/privacy, availability, reservation concurrency/idempotency/lifecycle/
+privacy, owner/customer UI, admin inspection, security headers/rate limits, and
+backup/restore. The committed Playwright/axe suite runs locally against Chrome
+and the local Supabase stack; it is not part of CI. See
+`docs/security-review.md`.
 
 ## Hosted demo policy
 

@@ -58,6 +58,19 @@ uvicorn app.main:app --reload --port 8000
 The storage setup script creates the private `listing-photos` bucket. Uploads
 are re-encoded with Pillow and served through short-lived signed URLs.
 
+With the API running, seed idempotent, visibly labeled demo data:
+
+```bash
+STHALO_DEMO_PASSWORD='<demo-only-password>' python scripts/seed_demo.py
+python scripts/seed_demo.py --cleanup
+```
+
+The seed creates `owner@demo.sthalo.invalid`, `customer@demo.sthalo.invalid`, and
+`admin@demo.sthalo.invalid`, three Nashik `[DEMO]` listings, a demo vehicle, and
+one confirmed booking for tomorrow at 10:00 IST. The password is required and is
+never committed. Point `STHALO_API_BASE_URL` at a hosted API and add
+`--confirm-demo-project` when seeding the dedicated hosted demo project.
+
 Health endpoints:
 
 - `GET http://127.0.0.1:8000/health/live` — process liveness.
@@ -205,6 +218,8 @@ docker build -t sthalo-backend .
 docker run --rm -p 8000:8000 --env-file .env sthalo-backend
 ```
 
-The image includes `alembic.ini` and the migration directory. The container
-needs the same environment variables as the local process. Do not bake secrets
-into the image.
+The image includes `alembic.ini` and the migration directory. It honors the
+provider-injected `$PORT` and defaults to `8000` when unset. The container needs
+the same environment variables as the local process. Do not bake secrets into the
+image. The root `render.yaml` is an unapplied Render blueprint; it does not
+contain provider URLs or secrets.
